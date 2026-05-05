@@ -1,0 +1,13 @@
+{
+  "name": "finsight-ai",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "start cmd /k \"cd backend && npm run dev\" && start cmd /k \"cd frontend && npm run dev\"",
+    "dev:backend":  "npm run dev  --prefix backend",
+    "dev:frontend": "npm run dev  --prefix frontend",
+    "install:all":  "npm install --prefix backend && npm install --prefix frontend",
+    "build":        "npm run build --prefix frontend",
+    "start":        "npm start --prefix backend"
+  }
+}
