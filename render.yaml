@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: finsight-frontend
+    env: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    headers:
+      - path: /assets/*.js
+        name: Content-Type
+        value: application/javascript; charset=utf-8
+      - path: /assets/*.mjs
+        name: Content-Type
+        value: application/javascript; charset=utf-8
+      - path: /assets/*.css
+        name: Content-Type
+        value: text/css; charset=utf-8
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        value: https://finsight-backend-yhlyekuzja-uc.a.run.app
+      - key: VITE_SUPABASE_URL
+        value: https://sdzpywrvhuczthmkcnnw.supabase.co
+      - key: VITE_SUPABASE_ANON_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNkenB5d3J2aHVjenRobWtjbm53Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzMTAxNDYsImV4cCI6MjA5Mzg4NjE0Nn0.LCJyLhDuSYLYW6WxFsV4ZLoEF2z97mL1vIYuzLn58UE
