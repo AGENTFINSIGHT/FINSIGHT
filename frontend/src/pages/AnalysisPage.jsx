@@ -34,7 +34,10 @@ export default function AnalysisPage() {
 
   const exportCSV = () => {
     if (!data) return;
-    const { transactions = [], total_debit = 0, total_credit = 0, currency = '$' } = data.result_json;
+    const { transactions = [], currency = '$' } = data.result_json;
+    // Recalculate from actual transactions to avoid AI summary-field errors
+    const total_debit  = transactions.filter(t => t.type === 'debit') .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    const total_credit = transactions.filter(t => t.type === 'credit').reduce((s, t) => s + (Number(t.amount) || 0), 0);
     const rows = [
       ['FinSight AI — Bank Statement Analysis'],
       ['File', data.file_name],
@@ -68,9 +71,10 @@ export default function AnalysisPage() {
       {/* Page header */}
       <div style={{ borderBottom: '1px solid var(--border-subtle)', padding: '16px 0', marginBottom: 32 }}>
         <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          {/* Left: back + file info */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <button className="btn btn-ghost btn-sm" onClick={() => navigate('/history')}>
-              <ArrowLeft size={14} /> Back to History
+            <button className="btn btn-ghost btn-sm" onClick={() => navigate('/dashboard')}>
+              <ArrowLeft size={14} /> Back to Dashboard
             </button>
             {data && (() => {
               const Icon  = TYPE_ICON[data.file_type]  || FileText;
@@ -91,28 +95,35 @@ export default function AnalysisPage() {
             })()}
           </div>
 
-          {data && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              {/* Quick stats */}
-              <div style={{ display: 'flex', gap: 20 }}>
-                <div style={{ textAlign: 'center' }}>
-                  <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: 2 }}>SPENT</p>
-                  <p style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, color: 'var(--red)', fontSize: '0.9rem' }}>{fmt(data.total_debit, data.currency)}</p>
+          {/* Right: quick stats + export */}
+          {data && (() => {
+            // Always recalculate from transactions to avoid AI summary-field errors
+            const txns   = data.result_json?.transactions || [];
+            const spent  = txns.filter(t => t.type === 'debit') .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+            const income = txns.filter(t => t.type === 'credit').reduce((s, t) => s + (Number(t.amount) || 0), 0);
+            const cur    = data.result_json?.currency || '$';
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <div style={{ display: 'flex', gap: 20 }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: 2 }}>SPENT</p>
+                    <p style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, color: 'var(--red)', fontSize: '0.9rem' }}>{fmt(spent, cur)}</p>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: 2 }}>INCOME</p>
+                    <p style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, color: 'var(--emerald)', fontSize: '0.9rem' }}>{fmt(income, cur)}</p>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: 2 }}>TXNs</p>
+                    <p style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.9rem' }}>{data.txn_count}</p>
+                  </div>
                 </div>
-                <div style={{ textAlign: 'center' }}>
-                  <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: 2 }}>INCOME</p>
-                  <p style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, color: 'var(--emerald)', fontSize: '0.9rem' }}>{fmt(data.total_credit, data.currency)}</p>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: 2 }}>TXNs</p>
-                  <p style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.9rem' }}>{data.txn_count}</p>
-                </div>
+                <button className="btn btn-primary btn-sm" onClick={exportCSV}>
+                  <Download size={13} /> Export CSV
+                </button>
               </div>
-              <button className="btn btn-primary btn-sm" onClick={exportCSV}>
-                <Download size={13} /> Export CSV
-              </button>
-            </div>
-          )}
+            );
+          })()}
         </div>
       </div>
 

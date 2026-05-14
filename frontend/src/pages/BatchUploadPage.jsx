@@ -3,18 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import {
   FolderOpen, Upload, Play, CheckCircle2, XCircle,
   Clock, ChevronDown, ChevronUp, Download, Loader2,
-  BarChart3, X, AlertCircle
+  BarChart3, X, AlertCircle, RefreshCw
 } from 'lucide-react';
-import { extractTextFromPDF } from '../utils/pdfExtractor';
-import { analyzeText } from '../utils/apiClient';
 import ResultsDashboard from '../components/ResultsDashboard';
-
-const S = { pending: 'pending', analyzing: 'analyzing', done: 'done', failed: 'failed' };
+import { useBatch, S } from '../contexts/BatchContext';
 
 const STATUS_UI = {
   pending: { icon: Clock, color: 'var(--text-muted)', label: 'Pending' },
   analyzing: { icon: Loader2, color: 'var(--blue)', label: 'Analyzing…' },
-  done: { icon: CheckCircle2, color: 'var(--emerald)', label: 'Done' },
+  done: { icon: CheckCircle2, color: 'var(--emerald)', label: 'Completed' },
   failed: { icon: XCircle, color: 'var(--red)', label: 'Failed' },
 };
 
@@ -23,8 +20,7 @@ function fmt(n, c = '$') {
 }
 
 export default function BatchUploadPage() {
-  const [queue, setQueue] = useState([]);
-  const [running, setRunning] = useState(false);
+  const { queue, running, addFiles, removeItem, clearDone, retryItem, runAll, stopAll } = useBatch();
   const [expanded, setExpanded] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef();
@@ -39,42 +35,6 @@ export default function BatchUploadPage() {
       folderRef.current.setAttribute('mozdirectory', '');
     }
   }, []);
-
-  const addFiles = (files) => {
-    const pdfs = Array.from(files).filter(f => f.type === 'application/pdf');
-    if (!pdfs.length) return;
-    setQueue(prev => {
-      const existingNames = new Set(prev.map(q => q.name));
-      const newItems = pdfs
-        .filter(f => !existingNames.has(f.name))
-        .map(f => ({ id: `${f.name}_${Math.random()}`, file: f, name: f.name, status: S.pending, result: null, error: null }));
-      return [...prev, ...newItems];
-    });
-  };
-
-  const removeItem = (id) => setQueue(prev => prev.filter(q => q.id !== id));
-  const clearDone = () => setQueue(prev => prev.filter(q => q.status !== S.done));
-
-  const runAll = async () => {
-    const pending = queue.filter(q => q.status === S.pending || q.status === S.failed);
-    if (!pending.length) return;
-    setRunning(true);
-
-    for (const item of pending) {
-      setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: S.analyzing } : q));
-      try {
-        const text = await extractTextFromPDF(item.file);
-        if (!text.trim()) throw new Error('No text found in PDF.');
-        const result = await analyzeText(text, item.name, 'pdf');
-        setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: S.done, result } : q));
-      } catch (err) {
-        setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: S.failed, error: err.message } : q));
-      }
-      // Small delay between files to avoid rate limits
-      await new Promise(r => setTimeout(r, 800));
-    }
-    setRunning(false);
-  };
 
   const exportCombinedCSV = () => {
     const done = queue.filter(q => q.status === S.done && q.result);
@@ -238,15 +198,20 @@ export default function BatchUploadPage() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
               <h4 style={{ margin: 0 }}>{queue.length} file{queue.length !== 1 ? 's' : ''} queued</h4>
               <div style={{ display: 'flex', gap: 8 }}>
-                {!running && pendingCount > 0 && (
+                {!running && (pendingCount > 0 || failedCount > 0) && (
                   <button className="btn btn-primary" id="btn-analyze-all" onClick={runAll}>
-                    <Play size={14} /> Analyze {pendingCount > 1 ? `All ${pendingCount} Files` : '1 File'}
+                    <Play size={14} /> Analyze {pendingCount + failedCount > 1 ? `All ${pendingCount + failedCount} Pending Files` : '1 File'}
                   </button>
                 )}
                 {running && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--blue)', fontSize: '0.85rem' }}>
-                    <div className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />
-                    Processing… ({doneCount + failedCount}/{queue.length})
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--blue)', fontSize: '0.85rem' }}>
+                      <div className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />
+                      Processing… ({doneCount + failedCount}/{queue.length})
+                    </div>
+                    <button className="btn btn-ghost btn-sm" style={{ color: 'var(--red)', border: '1px solid rgba(248, 113, 113, 0.2)', padding: '4px 12px' }} onClick={stopAll}>
+                      Stop
+                    </button>
                   </div>
                 )}
               </div>
@@ -283,18 +248,27 @@ export default function BatchUploadPage() {
                           </p>
                         )}
                         {item.status === S.failed && (
-                          <p className="text-xs" style={{ color: 'var(--red)', margin: '2px 0 0' }}>
-                            {item.error}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                            <p className="text-xs" style={{ color: 'var(--red)', margin: 0 }}>
+                              {item.error}
+                            </p>
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              style={{ fontSize: '0.7rem', color: 'var(--blue)', padding: '2px 8px' }}
+                              onClick={() => retryItem(item.id)}
+                            >
+                              <RefreshCw size={12} style={{ marginRight: 4 }} /> Retry
+                            </button>
                             {item.error?.includes('scanned') && (
                               <button
                                 className="btn btn-ghost btn-sm"
-                                style={{ marginLeft: 8, fontSize: '0.7rem', color: 'var(--blue)', padding: '2px 8px' }}
+                                style={{ fontSize: '0.7rem', color: 'var(--blue)', padding: '2px 8px' }}
                                 onClick={() => navigate('/')}
                               >
                                 → Upload as Snapshot
                               </button>
                             )}
-                          </p>
+                          </div>
                         )}
                       </div>
                       <span style={{ fontSize: '0.75rem', color, fontWeight: 600 }}>{label}</span>
@@ -304,7 +278,7 @@ export default function BatchUploadPage() {
                           {isExpanded ? 'Hide' : 'View'}
                         </button>
                       )}
-                      {item.status === S.pending && !running && (
+                      {(item.status === S.pending || item.status === S.failed) && !running && (
                         <button className="btn btn-ghost btn-sm" onClick={() => removeItem(item.id)}>
                           <X size={13} />
                         </button>

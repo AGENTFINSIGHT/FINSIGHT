@@ -26,6 +26,9 @@ const openrouter = new OpenAI({
 // Free models — IDs verified live from OpenRouter API
 // Text-only models (PDF/paste analysis + chat)
 const TEXT_MODELS = [
+  'baidu/qianfan-ocr-fast:free',                 // ⚡⚡⚡⚡⚡ Medium stability - OCR
+  'openai/gpt-oss-20b:free',                     // ⚡⚡⚡⚡ Excellent stability - Extraction
+  'gemma-4-26b-a4b:free',                        // ⚡⚡⚡⚡ Good stability - Fast parsing
   'qwen/qwen3-next-80b-a3b-instruct:free',      // 262K ctx — user's primary
   'nvidia/nemotron-3-super-120b-a12b:free',      // 262K ctx — powerful fallback
   'google/gemma-4-31b-it:free',                  // 262K ctx
@@ -42,12 +45,13 @@ const VISION_MODELS = [
 ];
 
 // ── System prompt ────────────────────────────────────────────────
-const SYSTEM_PROMPT = `You are an advanced AI financial assistant. Analyze the bank statement and return ONLY valid JSON — no markdown, no code fences, no explanation, no thinking tags.
+const SYSTEM_PROMPT = `You are an advanced AI financial assistant. Analyze the bank/credit card statement and return ONLY valid JSON — no markdown, no code fences, no explanation, no thinking tags.
 
 Detect currency from context ($ USD default, ₹ INR if Indian merchants).
 
 Return EXACTLY this JSON schema:
 {
+  "card_number": "XXXXXXXXXXXX1234",
   "currency": "$",
   "transactions": [{ "date": "YYYY-MM-DD", "description": "merchant name", "amount": 0.00, "type": "credit|debit", "category": "Food|Fuel|Travel|Shopping|Bills|Entertainment|Healthcare|Others" }],
   "category_summary": { "Food":0,"Fuel":0,"Travel":0,"Shopping":0,"Bills":0,"Entertainment":0,"Healthcare":0,"Others":0 },
@@ -58,7 +62,10 @@ Return EXACTLY this JSON schema:
   "suggestions": ["string"]
 }
 
-Rules: normalize merchant names, remove duplicates, infer categories semantically. Return raw JSON only — start with { and end with }.`;
+Rules:
+- card_number: Extract the credit/debit card number shown in the statement header or transaction rows (e.g. "6528XXXXXXXX5003"). If not found, use "Unknown Card".
+- Normalize merchant names, remove duplicates, infer categories semantically.
+- Return raw JSON only — start with { and end with }.`;
 
 // ── JSON parser — strips <think> tags (Qwen3 chain-of-thought) ──
 function parseJSON(raw) {
@@ -70,8 +77,24 @@ function parseJSON(raw) {
   return JSON.parse(noThink.slice(start, end + 1));
 }
 
+/** Recalculate total_debit and total_credit by summing the extracted transactions.
+ *  This prevents AI hallucinations where it reads "Previous Statement Dues" or
+ *  other balance summary fields as transaction amounts, inflating the totals. */
+function recalcTotals(result) {
+  const txns = result.transactions || [];
+  let debit = 0, credit = 0;
+  txns.forEach(t => {
+    const amt = Number(t.amount) || 0;
+    if (t.type === 'debit')  debit  += amt;
+    if (t.type === 'credit') credit += amt;
+  });
+  result.total_debit  = Math.round(debit  * 100) / 100;
+  result.total_credit = Math.round(credit * 100) / 100;
+  return result;
+}
+
 // ── AI call with fallback chain ──────────────────────────────────
-async function callAIWithFallback(messages, modelChain) {
+async function callAIWithFallback(messages, modelChain, validator = null) {
   let lastErr;
   for (const model of modelChain) {
     try {
@@ -84,17 +107,26 @@ async function callAIWithFallback(messages, modelChain) {
       });
       const text = resp.choices[0]?.message?.content || '';
       if (!text.trim()) throw new Error('Empty response from model');
+      
+      // If a validator is provided, run it to ensure the response is well-formed
+      if (validator) validator(text);
+
       console.log(`✅ Success with: ${model} (${text.length} chars)`);
       return text;
     } catch (err) {
       lastErr = err;
       const code = err.status || err.message || '';
-      const isSkip = String(code).includes('429') || String(code).includes('503') ||
+      const isRateLimit = String(code).includes('429') || String(code).includes('503') ||
         err.message?.includes('429') || err.message?.includes('503') ||
         err.message?.includes('rate') || err.message?.includes('quota') ||
         err.message?.includes('Provider returned error');
-      if (isSkip && modelChain.indexOf(model) < modelChain.length - 1) {
-        console.warn(`⚠️  ${model} rate-limited — trying next model…`);
+
+      if (modelChain.indexOf(model) < modelChain.length - 1) {
+        if (isRateLimit) {
+          console.warn(`⚠️  ${model} rate-limited — trying next model…`);
+        } else {
+          console.warn(`⚠️  ${model} failed (${err.message}) — trying next model…`);
+        }
         await new Promise(r => setTimeout(r, 500)); // small delay before retry
         continue;
       }
@@ -131,9 +163,9 @@ router.post('/text', authMiddleware, async (req, res) => {
     const raw = await callAIWithFallback([
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: `Analyze this bank statement and return the JSON:\n\n${text}` },
-    ], TEXT_MODELS);
+    ], TEXT_MODELS, parseJSON);
 
-    const data = parseJSON(raw);
+    const data = recalcTotals(parseJSON(raw));
     await saveAnalysis(req.user.id, fileName, fileType, null, data);
     res.json(data);
   } catch (err) {
@@ -167,9 +199,9 @@ router.post('/image', authMiddleware, upload.single('image'), async (req, res) =
           { type: 'image_url', image_url: { url: base64DataUrl } },
         ],
       },
-    ], VISION_MODELS);
+    ], VISION_MODELS, parseJSON);
 
-    const data = parseJSON(raw);
+    const data = recalcTotals(parseJSON(raw));
     await saveAnalysis(req.user.id, fileName, fileType, fileUrl, data);
     res.json(data);
   } catch (err) {

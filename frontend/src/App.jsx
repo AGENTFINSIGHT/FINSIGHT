@@ -1,14 +1,15 @@
 import { useState } from 'react';
-import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom';
-import { Brain, Zap, BarChart3, Shield, MessageSquare, Clock, LogOut, User, AlertCircle, FolderOpen } from 'lucide-react';
+import { BrowserRouter, Routes, Route, Link, useNavigate, Navigate } from 'react-router-dom';
+import { Brain, Zap, BarChart3, Shield, MessageSquare, LayoutDashboard, LogOut, User, AlertCircle, FolderOpen } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { BatchProvider } from './contexts/BatchContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import UploadZone from './components/UploadZone';
 import ProcessingScreen from './components/ProcessingScreen';
 import ResultsDashboard from './components/ResultsDashboard';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
-import HistoryPage from './pages/HistoryPage';
+import DashboardPage from './pages/DashboardPage';
 import AnalysisPage from './pages/AnalysisPage';
 import BatchUploadPage from './pages/BatchUploadPage';
 import { analyzeText, analyzeImage } from './utils/apiClient';
@@ -33,7 +34,7 @@ function Header() {
           {user ? (
             <>
               <Link to="/batch" className="btn btn-ghost btn-sm"><FolderOpen size={14} /> Batch Upload</Link>
-              <Link to="/history" className="btn btn-ghost btn-sm"><Clock size={14} /> History</Link>
+              <Link to="/dashboard" className="btn btn-ghost btn-sm"><LayoutDashboard size={14} /> Dashboard</Link>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)' }}>
                 <User size={13} color="var(--blue)" />
                 <span className="text-xs text-muted" style={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</span>
@@ -80,7 +81,7 @@ function HomePage() {
             <h1 style={{ marginBottom: 16 }}>Your AI <span style={{ background: 'var(--gradient-primary)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Financial Analyst</span></h1>
             <p style={{ fontSize: '1.05rem', maxWidth: 560, margin: '0 auto 32px', color: 'var(--text-secondary)', lineHeight: 1.7 }}>Upload a PDF, drop a photo snapshot, or paste OCR text. Get instant spending analysis, charts, and advice — saved to your history.</p>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-              {[[BarChart3, 'Spending Charts'], [Shield, 'Smart Categorization'], [MessageSquare, 'AI Chatbot'], [Clock, 'Saved History']].map(([Icon, t]) => (
+              {[[BarChart3, 'Spending Charts'], [Shield, 'Smart Categorization'], [MessageSquare, 'AI Chatbot'], [LayoutDashboard, 'Dashboard']].map(([Icon, t]) => (
                 <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 99, background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                   <Icon size={12} color="var(--blue)" /> {t}
                 </div>
@@ -132,15 +133,19 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/" element={<><Header /><HomePage /></>} />
-          <Route path="/history" element={<ProtectedRoute><Header /><HistoryPage /></ProtectedRoute>} />
-          <Route path="/analysis/:id" element={<ProtectedRoute><Header /><AnalysisPage /></ProtectedRoute>} />
-          <Route path="/batch" element={<ProtectedRoute><Header /><BatchUploadPage /></ProtectedRoute>} />
-        </Routes>
+        <BatchProvider>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/" element={<><Header /><HomePage /></>} />
+            <Route path="/dashboard" element={<ProtectedRoute><Header /><DashboardPage /></ProtectedRoute>} />
+            <Route path="/history" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/analysis/:id" element={<ProtectedRoute><Header /><AnalysisPage /></ProtectedRoute>} />
+            <Route path="/batch" element={<ProtectedRoute><Header /><BatchUploadPage /></ProtectedRoute>} />
+          </Routes>
+        </BatchProvider>
       </AuthProvider>
     </BrowserRouter>
   );
 }
+

@@ -26,9 +26,13 @@ export default function ResultsDashboard({ data, onReset, apiKey, saved = false 
   const [activeTab, setActiveTab] = useState('transactions');
   const currency = data.currency || '$';
 
-  const totalDebit  = data.total_debit  || 0;
-  const totalCredit = data.total_credit || 0;
-  const txnCount    = data.transactions?.length || 0;
+  // Always derive totals from the transactions list — this prevents AI
+  // hallucinations (e.g. reading "Previous Statement Dues" as a debit) from
+  // inflating the displayed figures.
+  const txns = data.transactions || [];
+  const totalDebit  = txns.filter(t => t.type === 'debit') .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+  const totalCredit = txns.filter(t => t.type === 'credit').reduce((s, t) => s + (Number(t.amount) || 0), 0);
+  const txnCount    = txns.length;
   const topCat      = Object.entries(data.category_summary || {})
     .sort(([, a], [, b]) => Number(b) - Number(a))[0]?.[0] || '—';
 
