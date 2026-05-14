@@ -96,6 +96,7 @@ code, pre { font-family: 'JetBrains Mono', monospace; }
 /* ─── Layout ─── */
 .container { max-width: 1280px; margin: 0 auto; padding: 0 24px; }
 .page { min-height: 100vh; }
+/* page already set above */
 
 /* ─── Cards ─── */
 .card {
@@ -405,16 +406,88 @@ tbody tr:hover { background: var(--bg-card-hover); }
 }
 
 /* ─── Responsive ─── */
-@media (max-width: 768px) {
-  .container { padding: 0 16px; }
-  .stat-grid { grid-template-columns: repeat(2, 1fr); }
-  .filter-bar { flex-direction: column; }
-  .chat-bubble { max-width: 95%; }
+
+/* Tablet ≤ 1024px */
+@media (max-width: 1024px) {
+  .insight-grid { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* Mobile ≤ 768px */
+@media (max-width: 768px) {
+  .container { padding: 0 14px; }
+
+  /* Typography scale-down */
+  h1 { font-size: clamp(1.6rem, 7vw, 2.4rem); }
+  h2 { font-size: clamp(1.25rem, 5vw, 1.8rem); }
+
+  /* Stat grid → 2-col on tablet */
+  .stat-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+
+  /* Insight cards → 1-col */
+  .insight-grid { grid-template-columns: 1fr; }
+
+  /* Filter bar stacks */
+  .filter-bar { flex-direction: column; align-items: stretch; }
+  .filter-bar input, .filter-bar select { width: 100%; }
+
+  /* Chat */
+  .chat-window { height: 420px; }
+  .chat-bubble { max-width: 92%; }
+
+  /* Table — enable horizontal scroll */
+  .table-wrapper { border-radius: var(--radius-md); }
+  td, th { padding: 10px 12px; font-size: 0.8rem; }
+
+  /* Tabs → scrollable row */
+  .tabs { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+
+  /* Sections */
+  .section-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+
+  /* Cards padding */
+  .p-32 { padding: 20px; }
+  .p-24 { padding: 16px; }
+}
+
+/* Small mobile ≤ 480px */
 @media (max-width: 480px) {
+  .container { padding: 0 12px; }
+
+  /* Stat grid → 1-col */
   .stat-grid { grid-template-columns: 1fr; }
+  .stat-card { padding: 16px 18px; }
+  .stat-value { font-size: 1.5rem; }
+
+  /* Tabs */
   .tabs { gap: 2px; }
-  .tab-btn { padding: 8px 10px; font-size: 0.78rem; }
+  .tab-btn { padding: 7px 10px; font-size: 0.76rem; gap: 4px; }
+
+  /* Chat */
+  .chat-window { height: 360px; }
+  .chat-bubble { max-width: 97%; font-size: 0.82rem; }
+  .chat-input-row { padding: 10px; gap: 8px; }
+
+  /* Buttons */
+  .btn-lg { padding: 11px 20px; font-size: 0.92rem; }
+
+  /* JSON viewer */
+  .json-viewer pre { font-size: 0.72rem; padding: 16px; }
+
+  /* Badges */
+  .badge { font-size: 0.67rem; padding: 2px 7px; }
+
+  /* Section header */
+  .section-header { gap: 6px; }
+  .section-title { font-size: 1rem; }
+}
+
+/* Very small ≤ 360px */
+@media (max-width: 360px) {
+  .container { padding: 0 10px; }
+  .tab-btn { padding: 6px 8px; font-size: 0.72rem; }
+  .btn { padding: 8px 14px; font-size: 0.8rem; }
+  .stat-value { font-size: 1.3rem; }
 }
 
 /* ─── Misc utilities ─── */

@@ -102,7 +102,7 @@ export default function BatchUploadPage() {
               <p className="text-xs text-muted">Analyze multiple PDFs at once</p>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {doneCount > 0 && <button className="btn btn-ghost btn-sm" onClick={clearDone}>Clear Done</button>}
             {doneCount > 0 && (
               <button className="btn btn-primary btn-sm" onClick={exportCombinedCSV}>

@@ -22,34 +22,34 @@ function Header() {
 
   return (
     <header style={{ borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-glass)', backdropFilter: 'blur(20px)', position: 'sticky', top: 0, zIndex: 100 }}>
-      <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64 }}>
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--gradient-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(99,179,237,0.3)' }}><Brain size={18} color="white" /></div>
+      <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, minHeight: 56, padding: '8px 24px' }}>
+        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flexShrink: 0 }}>
+          <div style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--gradient-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(99,179,237,0.3)' }}><Brain size={17} color="white" /></div>
           <div>
-            <span style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: '1.1rem', background: 'var(--gradient-primary)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>FinSight AI</span>
-            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'block', lineHeight: 1, marginTop: 1 }}>Powered by OpenRouter</span>
+            <span style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: '1rem', background: 'var(--gradient-primary)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>FinSight AI</span>
+            <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', display: 'block', lineHeight: 1, marginTop: 1 }}>Powered by OpenRouter</span>
           </div>
         </Link>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           {user ? (
             <>
-              <Link to="/batch" className="btn btn-ghost btn-sm"><FolderOpen size={14} /> Batch Upload</Link>
-              <Link to="/dashboard" className="btn btn-ghost btn-sm"><LayoutDashboard size={14} /> Dashboard</Link>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)' }}>
-                <User size={13} color="var(--blue)" />
-                <span className="text-xs text-muted" style={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</span>
+              <Link to="/batch" className="btn btn-ghost btn-sm" style={{ fontSize: '0.78rem', padding: '5px 10px' }}><FolderOpen size={13} /> <span style={{ display: 'inline' }}>Batch</span></Link>
+              <Link to="/dashboard" className="btn btn-ghost btn-sm" style={{ fontSize: '0.78rem', padding: '5px 10px' }}><LayoutDashboard size={13} /> <span style={{ display: 'inline' }}>Dashboard</span></Link>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)' }}>
+                <User size={12} color="var(--blue)" />
+                <span className="text-xs text-muted" style={{ maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</span>
               </div>
-              <button className="btn btn-ghost btn-sm" onClick={handleSignOut} id="btn-signout"><LogOut size={14} /></button>
+              <button className="btn btn-ghost btn-sm" onClick={handleSignOut} id="btn-signout" style={{ padding: '5px 10px' }}><LogOut size={13} /></button>
             </>
           ) : (
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 6 }}>
               <Link to="/login" className="btn btn-ghost btn-sm">Sign In</Link>
               <Link to="/register" className="btn btn-primary btn-sm">Get Started</Link>
             </div>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 4 }}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--emerald)', boxShadow: '0 0 8px var(--emerald)' }} />
-            <span className="text-xs text-muted">AI Online</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--emerald)', boxShadow: '0 0 6px var(--emerald)' }} />
+            <span className="text-xs text-muted" style={{ whiteSpace: 'nowrap' }}>AI Online</span>
           </div>
         </div>
       </div>
@@ -70,7 +70,7 @@ function HomePage() {
   };
 
   return (
-    <main className="container" style={{ padding: '48px 24px' }}>
+    <main className="container" style={{ padding: 'clamp(24px, 5vw, 56px) 0' }}>
       {stage === 'home' && (
         <div>
           <div className="text-center animate-fade-up" style={{ marginBottom: 56 }}>

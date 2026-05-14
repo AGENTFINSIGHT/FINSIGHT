@@ -51,7 +51,7 @@ export default function DashboardPage() {
               <p className="text-xs text-muted">{analyses.length} statement{analyses.length !== 1 ? 's' : ''} analysed</p>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button className="btn btn-ghost btn-sm" onClick={load}><RefreshCw size={13} /> Refresh</button>
             <button className="btn btn-ghost btn-sm" onClick={() => navigate('/')}>← Upload Statement</button>
           </div>
@@ -60,7 +60,7 @@ export default function DashboardPage() {
 
       <div className="container" style={{ paddingBottom: 60 }}>
         {/* Tab switcher */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 28, background: 'var(--bg-card)', padding: 4, borderRadius: 12, border: '1px solid var(--border-subtle)', width: 'fit-content' }}>
+        <div style={{ display: 'flex', gap: 4, marginBottom: 28, background: 'var(--bg-card)', padding: 4, borderRadius: 12, border: '1px solid var(--border-subtle)', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {TABS.map(t => {
             const Icon = t.icon;
             const active = tab === t.key;
