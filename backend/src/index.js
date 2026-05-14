@@ -7,7 +7,23 @@ import historyRouter from './routes/history.js';
 const app  = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors({ origin: process.env.FRONTEND_URL || '*' }));
+// Build allowed origins list: always allow localhost for local dev,
+// plus any production URLs set in FRONTEND_URL (comma-separated).
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:4173', // vite preview
+  ...( process.env.FRONTEND_URL
+    ? process.env.FRONTEND_URL.split(',').map(u => u.trim())
+    : [] )
+];
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (curl, mobile apps, etc.)
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
+  credentials: true,
+}));
 app.use(express.json({ limit: '20mb' }));
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
