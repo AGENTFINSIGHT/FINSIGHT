@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Link, useNavigate, Navigate } from 'react-router-dom';
-import { Brain, Zap, BarChart3, Shield, MessageSquare, LayoutDashboard, LogOut, User, AlertCircle, FolderOpen } from 'lucide-react';
+import { Brain, Zap, BarChart3, Shield, MessageSquare, LayoutDashboard, LogOut, User, AlertCircle, FolderOpen, Menu, X } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { BatchProvider } from './contexts/BatchContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -18,41 +18,88 @@ import './index.css';
 function Header() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const handleSignOut = async () => { await signOut(); navigate('/login'); };
+  const [menuOpen, setMenuOpen] = useState(false);
+  const handleSignOut = async () => { await signOut(); navigate('/login'); setMenuOpen(false); };
 
   return (
-    <header style={{ borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-glass)', backdropFilter: 'blur(20px)', position: 'sticky', top: 0, zIndex: 100 }}>
-      <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, minHeight: 56, padding: '8px 24px' }}>
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flexShrink: 0 }}>
-          <div style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--gradient-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(99,179,237,0.3)' }}><Brain size={17} color="white" /></div>
+    <header className="site-header">
+      <div className="header-inner">
+        {/* Logo */}
+        <Link to="/" className="header-logo" onClick={() => setMenuOpen(false)}>
+          <div className="header-logo-icon">
+            <Brain size={18} color="white" />
+          </div>
           <div>
-            <span style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: '1rem', background: 'var(--gradient-primary)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>FinSight AI</span>
-            <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', display: 'block', lineHeight: 1, marginTop: 1 }}>Powered by OpenRouter</span>
+            <span className="header-brand">FinSight AI</span>
+            <span className="header-sub">Powered by OpenRouter</span>
           </div>
         </Link>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+
+        {/* Desktop nav */}
+        <nav className="header-nav-desktop">
           {user ? (
             <>
-              <Link to="/batch" className="btn btn-ghost btn-sm" style={{ fontSize: '0.78rem', padding: '5px 10px' }}><FolderOpen size={13} /> <span style={{ display: 'inline' }}>Batch</span></Link>
-              <Link to="/dashboard" className="btn btn-ghost btn-sm" style={{ fontSize: '0.78rem', padding: '5px 10px' }}><LayoutDashboard size={13} /> <span style={{ display: 'inline' }}>Dashboard</span></Link>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)' }}>
+              <Link to="/batch" className="btn btn-ghost btn-sm"><FolderOpen size={13} /> Batch</Link>
+              <Link to="/dashboard" className="btn btn-ghost btn-sm"><LayoutDashboard size={13} /> Dashboard</Link>
+              <div className="header-user-pill">
                 <User size={12} color="var(--blue)" />
-                <span className="text-xs text-muted" style={{ maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</span>
+                <span className="header-email">{user.email}</span>
               </div>
-              <button className="btn btn-ghost btn-sm" onClick={handleSignOut} id="btn-signout" style={{ padding: '5px 10px' }}><LogOut size={13} /></button>
+              <button className="btn btn-ghost btn-sm" onClick={handleSignOut} id="btn-signout"><LogOut size={13} /></button>
             </>
           ) : (
-            <div style={{ display: 'flex', gap: 6 }}>
+            <>
               <Link to="/login" className="btn btn-ghost btn-sm">Sign In</Link>
               <Link to="/register" className="btn btn-primary btn-sm">Get Started</Link>
-            </div>
+            </>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--emerald)', boxShadow: '0 0 6px var(--emerald)' }} />
-            <span className="text-xs text-muted" style={{ whiteSpace: 'nowrap' }}>AI Online</span>
+          <div className="ai-status-dot">
+            <div className="dot-green" />
+            <span>AI Online</span>
+          </div>
+        </nav>
+
+        {/* Mobile hamburger */}
+        <button
+          className="hamburger-btn"
+          onClick={() => setMenuOpen(o => !o)}
+          aria-label="Toggle menu"
+        >
+          {menuOpen ? <X size={22} /> : <Menu size={22} />}
+        </button>
+      </div>
+
+      {/* Mobile dropdown nav */}
+      {menuOpen && (
+        <div className="mobile-nav">
+          {user ? (
+            <>
+              <div className="mobile-nav-user">
+                <User size={13} color="var(--blue)" />
+                <span>{user.email}</span>
+              </div>
+              <Link to="/batch" className="mobile-nav-link" onClick={() => setMenuOpen(false)}>
+                <FolderOpen size={15} /> Batch Upload
+              </Link>
+              <Link to="/dashboard" className="mobile-nav-link" onClick={() => setMenuOpen(false)}>
+                <LayoutDashboard size={15} /> Dashboard
+              </Link>
+              <button className="mobile-nav-link mobile-nav-danger" onClick={handleSignOut}>
+                <LogOut size={15} /> Sign Out
+              </button>
+            </>
+          ) : (
+            <>
+              <Link to="/login" className="mobile-nav-link" onClick={() => setMenuOpen(false)}>Sign In</Link>
+              <Link to="/register" className="mobile-nav-link mobile-nav-primary" onClick={() => setMenuOpen(false)}>Get Started</Link>
+            </>
+          )}
+          <div className="mobile-nav-status">
+            <div className="dot-green" />
+            <span>AI Online</span>
           </div>
         </div>
-      </div>
+      )}
     </header>
   );
 }
@@ -70,26 +117,26 @@ function HomePage() {
   };
 
   return (
-    <main className="container" style={{ padding: 'clamp(24px, 5vw, 56px) 0' }}>
+    <main className="container home-main">
       {stage === 'home' && (
         <div>
-          <div className="text-center animate-fade-up" style={{ marginBottom: 56 }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 16px', borderRadius: 99, background: 'var(--blue-glow)', border: '1px solid rgba(99,179,237,0.2)', marginBottom: 20 }}>
+          <div className="home-hero animate-fade-up">
+            <div className="home-badge">
               <Zap size={12} color="var(--blue)" />
-              <span style={{ fontSize: '0.78rem', color: 'var(--blue)', fontWeight: 600 }}>Powered by Google Gemini 1.5 Flash</span>
+              <span>Powered by Google Gemini 1.5 Flash</span>
             </div>
-            <h1 style={{ marginBottom: 16 }}>Your AI <span style={{ background: 'var(--gradient-primary)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Financial Analyst</span></h1>
-            <p style={{ fontSize: '1.05rem', maxWidth: 560, margin: '0 auto 32px', color: 'var(--text-secondary)', lineHeight: 1.7 }}>Upload a PDF, drop a photo snapshot, or paste OCR text. Get instant spending analysis, charts, and advice — saved to your history.</p>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-              {[[BarChart3, 'Spending Charts'], [Shield, 'Smart Categorization'], [MessageSquare, 'AI Chatbot'], [LayoutDashboard, 'Dashboard']].map(([Icon, t]) => (
-                <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 99, background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+            <h1>Your AI <span className="gradient-text">Financial Analyst</span></h1>
+            <p className="home-desc">Upload a PDF, drop a photo snapshot, or paste OCR text. Get instant spending analysis, charts, and advice — saved to your history.</p>
+            <div className="home-chips">
+              {[[BarChart3, 'Spending Charts'], [Shield, 'Categorization'], [MessageSquare, 'AI Chat'], [LayoutDashboard, 'Dashboard']].map(([Icon, t]) => (
+                <div key={t} className="home-chip">
                   <Icon size={12} color="var(--blue)" /> {t}
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="card p-32" style={{ maxWidth: 720, margin: '0 auto' }}>
+          <div className="card home-upload-card">
             <h3 style={{ marginBottom: 6 }}>Upload Bank Statement</h3>
             <p className="text-sm text-muted" style={{ marginBottom: 24 }}>PDF · Image snapshot (PNG/JPG/WEBP) · OCR paste · $ USD &amp; ₹ INR supported</p>
             <UploadZone
@@ -105,20 +152,19 @@ function HomePage() {
             )}
           </div>
 
-          <div style={{ display: 'flex', gap: 24, justifyContent: 'center', marginTop: 36, flexWrap: 'wrap' }}>
+          <div className="home-trust">
             {['100% Secure', 'Gemini Vision OCR', 'Multi-Currency', 'Private History'].map(t => (
-              <span key={t} className="text-xs text-muted" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Shield size={11} color="var(--emerald)" /> {t}</span>
+              <span key={t} className="home-trust-item"><Shield size={11} color="var(--emerald)" /> {t}</span>
             ))}
           </div>
         </div>
       )}
 
-      {stage === 'processing' && <div className="card p-32" style={{ maxWidth: 560, margin: '0 auto' }}><ProcessingScreen /></div>}
-
+      {stage === 'processing' && <div className="card p-32 processing-wrap"><ProcessingScreen /></div>}
       {stage === 'results' && result && <ResultsDashboard data={result} onReset={() => { setStage('home'); setResult(null); }} saved />}
 
       {stage === 'error' && (
-        <div className="card p-32" style={{ maxWidth: 480, margin: '0 auto', textAlign: 'center' }}>
+        <div className="card p-32 error-wrap">
           <AlertCircle size={40} color="var(--red)" style={{ marginBottom: 16 }} />
           <h3 style={{ marginBottom: 8 }}>Analysis Failed</h3>
           <p className="text-sm text-muted" style={{ marginBottom: 24 }}>{error}</p>
@@ -148,4 +194,3 @@ export default function App() {
     </BrowserRouter>
   );
 }
-

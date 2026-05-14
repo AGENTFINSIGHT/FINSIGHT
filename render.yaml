@@ -1,3 +1,5 @@
+# Render URL: https://finsight-84b4.onrender.com
+# Cloud Run:  https://finsight-backend-yhlyekuzja-uc.a.run.app
 services:
   - type: web
     name: finsight-frontend
