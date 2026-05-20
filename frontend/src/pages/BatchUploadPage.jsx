@@ -240,6 +240,11 @@ export default function BatchUploadPage() {
                       <StatusIcon size={18} color={color} style={item.status === S.analyzing ? { animation: 'spin 1s linear infinite' } : {}} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <p style={{ fontWeight: 600, margin: 0, fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</p>
+                        {item.status === S.analyzing && item.progress && (
+                          <p className="text-xs" style={{ color: 'var(--blue)', margin: '2px 0 0' }}>
+                            {item.progress}
+                          </p>
+                        )}
                         {item.status === S.done && item.result && (
                           <p className="text-xs" style={{ color: 'var(--text-muted)', margin: '2px 0 0' }}>
                             Spent <span style={{ color: 'var(--red)' }}>{fmt(item.result.total_debit, item.result.currency)}</span>

@@ -206,38 +206,121 @@ export default function SpendCategorySnapshot({ analyses }) {
         </div>
       )}
 
-      <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid var(--border-subtle)' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div style={{
+        maxHeight: '440px',
+        overflowY: 'auto',
+        overflowX: 'auto',
+        borderRadius: 12,
+        border: '1px solid var(--border-subtle)',
+        background: 'var(--bg-card)',
+        position: 'relative'
+      }}>
+        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
           <thead>
-            <tr style={{ background: 'var(--bg-primary)' }}>
-              <th style={{ ...TH, textAlign: 'left', minWidth: 130 }}>Type</th>
-              <th style={{ ...TH, textAlign: 'left', minWidth: 160 }}>Spend Category</th>
-              {cards.map(c => <th key={c} style={{ ...TH, minWidth: 120 }}>{c}</th>)}
-              <th style={{ ...TH, background: YELLOW_BG, color: YELLOW_TEXT, minWidth: 100 }}>Total</th>
+            <tr style={{ background: 'var(--bg-secondary)' }}>
+              <th style={{
+                ...TH,
+                textAlign: 'left',
+                position: 'sticky',
+                left: 0,
+                top: 0,
+                zIndex: 12,
+                background: 'var(--bg-secondary)',
+                borderBottom: '1px solid var(--border-subtle)',
+                width: 130,
+                minWidth: 130,
+                maxWidth: 130
+              }}>Type</th>
+              <th style={{
+                ...TH,
+                textAlign: 'left',
+                position: 'sticky',
+                left: 130,
+                top: 0,
+                zIndex: 12,
+                background: 'var(--bg-secondary)',
+                borderBottom: '1px solid var(--border-subtle)',
+                width: 160,
+                minWidth: 160,
+                maxWidth: 160
+              }}>Spend Category</th>
+              {cards.map(c => (
+                <th
+                  key={c}
+                  style={{
+                    ...TH,
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 10,
+                    background: 'var(--bg-secondary)',
+                    borderBottom: '1px solid var(--border-subtle)',
+                    minWidth: 120
+                  }}
+                >
+                  {c}
+                </th>
+              ))}
+              <th style={{
+                ...TH,
+                position: 'sticky',
+                top: 0,
+                zIndex: 10,
+                background: 'var(--bg-secondary)',
+                borderBottom: '1px solid var(--border-subtle)',
+                color: YELLOW_TEXT,
+                minWidth: 100
+              }}>Total</th>
             </tr>
           </thead>
           <tbody>
             {allCategories.map(([type, cat], ri) => {
               const rowTotal = catTotals[cat] || 0;
               const typeColor = TYPE_COLOR[type] || 'var(--text-muted)';
+              const rowBg = ri % 2 === 0 ? 'var(--bg-card)' : '#171e2e';
               return (
-                <tr key={cat} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: ri % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
-                  <td style={{ ...TD, textAlign: 'left' }}>
+                <tr key={cat} style={{ background: ri % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
+                  <td style={{
+                    ...TD,
+                    textAlign: 'left',
+                    position: 'sticky',
+                    left: 0,
+                    zIndex: 8,
+                    background: rowBg,
+                    width: 130,
+                    minWidth: 130,
+                    maxWidth: 130,
+                    borderBottom: '1px solid rgba(255,255,255,0.04)'
+                  }}>
                     <span style={{ fontSize: '0.72rem', fontWeight: 600, color: typeColor, background: `${typeColor}18`, padding: '2px 8px', borderRadius: 99, whiteSpace: 'nowrap' }}>{type}</span>
                   </td>
-                  <td style={{ ...TD, textAlign: 'left', fontWeight: 500, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {cat}
-                    {isCustom(cat) && (
-                      <button onClick={() => removeCustomCat(cat)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0, display: 'flex', alignItems: 'center' }}>
-                        <X size={11} />
-                      </button>
-                    )}
+                  <td style={{
+                    ...TD,
+                    textAlign: 'left',
+                    fontWeight: 500,
+                    color: 'var(--text-primary)',
+                    position: 'sticky',
+                    left: 130,
+                    zIndex: 8,
+                    background: rowBg,
+                    width: 160,
+                    minWidth: 160,
+                    maxWidth: 160,
+                    borderBottom: '1px solid rgba(255,255,255,0.04)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {cat}
+                      {isCustom(cat) && (
+                        <button onClick={() => removeCustomCat(cat)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0, display: 'flex', alignItems: 'center' }}>
+                          <X size={11} />
+                        </button>
+                      )}
+                    </div>
                   </td>
                   {cards.map(c => {
                     const cell = matrix[cat]?.[c];
                     const val = cell?.total || 0;
                     return (
-                      <td key={c} style={{ ...TD, cursor: val > 0 ? 'pointer' : 'default' }}
+                      <td key={c} style={{ ...TD, cursor: val > 0 ? 'pointer' : 'default', borderBottom: '1px solid rgba(255,255,255,0.04)' }}
                         onClick={() => val > 0 && setModal({ title: `${cat} · ${c}`, transactions: cell.transactions })}>
                         {val > 0
                           ? <span style={{ color: BLUE, fontFamily: 'JetBrains Mono, monospace', fontWeight: 600, textDecoration: 'underline dotted' }}>{fmtINR(val)}</span>
@@ -245,22 +328,75 @@ export default function SpendCategorySnapshot({ analyses }) {
                       </td>
                     );
                   })}
-                  <td style={{ ...TD, background: YELLOW_BG, fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, color: rowTotal > 0 ? YELLOW_TEXT : 'var(--text-muted)' }}>
+                  <td style={{
+                    ...TD,
+                    background: YELLOW_BG,
+                    fontFamily: 'JetBrains Mono, monospace',
+                    fontWeight: 700,
+                    color: rowTotal > 0 ? YELLOW_TEXT : 'var(--text-muted)',
+                    borderBottom: '1px solid rgba(255,255,255,0.04)'
+                  }}>
                     {fmtINR(rowTotal)}
                   </td>
                 </tr>
               );
             })}
-            {/* Totals row */}
-            <tr style={{ background: YELLOW_BG, borderTop: '2px solid rgba(234,179,8,0.25)' }}>
-              <td style={{ ...TD, textAlign: 'left' }} />
-              <td style={{ ...TD, textAlign: 'left', fontWeight: 800, color: YELLOW_TEXT }}>Total</td>
+            {/* Totals row - sticky at bottom */}
+            <tr style={{ background: '#1e1c15' }}>
+              <td style={{
+                ...TD,
+                textAlign: 'left',
+                position: 'sticky',
+                bottom: 0,
+                left: 0,
+                zIndex: 12,
+                background: '#1e1c15',
+                borderTop: '2px solid rgba(234,179,8,0.25)',
+                width: 130,
+                minWidth: 130,
+                maxWidth: 130
+              }} />
+              <td style={{
+                ...TD,
+                textAlign: 'left',
+                fontWeight: 800,
+                color: YELLOW_TEXT,
+                position: 'sticky',
+                bottom: 0,
+                left: 130,
+                zIndex: 12,
+                background: '#1e1c15',
+                borderTop: '2px solid rgba(234,179,8,0.25)',
+                width: 160,
+                minWidth: 160,
+                maxWidth: 160
+              }}>Total</td>
               {cards.map(c => (
-                <td key={c} style={{ ...TD, fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, color: colTotals[c] > 0 ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                <td key={c} style={{
+                  ...TD,
+                  fontFamily: 'JetBrains Mono, monospace',
+                  fontWeight: 700,
+                  color: colTotals[c] > 0 ? 'var(--text-primary)' : 'var(--text-muted)',
+                  position: 'sticky',
+                  bottom: 0,
+                  zIndex: 10,
+                  background: '#1e1c15',
+                  borderTop: '2px solid rgba(234,179,8,0.25)',
+                }}>
                   {fmtINR(colTotals[c] || 0)}
                 </td>
               ))}
-              <td style={{ ...TD, fontFamily: 'JetBrains Mono, monospace', fontWeight: 800, color: YELLOW_TEXT }}>{fmtINR(grandTotal)}</td>
+              <td style={{
+                ...TD,
+                fontFamily: 'JetBrains Mono, monospace',
+                fontWeight: 800,
+                color: YELLOW_TEXT,
+                position: 'sticky',
+                bottom: 0,
+                zIndex: 10,
+                background: '#1e1c15',
+                borderTop: '2px solid rgba(234,179,8,0.25)',
+              }}>{fmtINR(grandTotal)}</td>
             </tr>
           </tbody>
         </table>

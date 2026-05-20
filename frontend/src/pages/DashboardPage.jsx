@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, RefreshCw, BarChart2, Tag, AlertCircle, Clock } from 'lucide-react';
+import { LayoutDashboard, RefreshCw, BarChart2, Tag, AlertCircle, Clock, FileStack } from 'lucide-react';
 import { fetchHistory } from '../utils/apiClient';
 import { fetchAnalysisById } from '../utils/apiClient';
 import TotalDuesSnapshot from '../components/TotalDuesSnapshot';
 import SpendCategorySnapshot from '../components/SpendCategorySnapshot';
 import HistorySnapshot from '../components/HistorySnapshot';
+import PdfExpenditureSnapshot from '../components/PdfExpenditureSnapshot';
 
 const TABS = [
-  { key: 'snapshot',   label: 'Total Dues Snapshot',      icon: BarChart2 },
-  { key: 'categories', label: 'Spend Category Snapshot',  icon: Tag },
-  { key: 'history',    label: 'Upload History',           icon: Clock },
+  { key: 'snapshot',      label: 'Total Dues Snapshot',    icon: BarChart2   },
+  { key: 'pdf_spend',     label: 'PDF Expenditure',        icon: FileStack   },
+  { key: 'categories',   label: 'Spend Category Snapshot', icon: Tag         },
+  { key: 'history',      label: 'Upload History',          icon: Clock       },
 ];
 
 export default function DashboardPage() {
@@ -66,7 +68,7 @@ export default function DashboardPage() {
             const active = tab === t.key;
             return (
               <button key={t.key} onClick={() => setTab(t.key)}
-                style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 18px', borderRadius: 9, border: 'none', cursor: 'pointer', fontWeight: active ? 700 : 500, fontSize: '0.84rem', transition: 'all 0.2s', background: active ? 'var(--bg-primary)' : 'transparent', color: active ? 'var(--blue)' : 'var(--text-muted)', boxShadow: active ? '0 2px 8px rgba(0,0,0,0.2)' : 'none' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 18px', borderRadius: 9, border: 'none', cursor: 'pointer', fontWeight: active ? 700 : 500, fontSize: '0.84rem', transition: 'all 0.2s', background: active ? 'var(--bg-primary)' : 'transparent', color: active ? 'var(--blue)' : 'var(--text-muted)', boxShadow: active ? '0 2px 8px rgba(0,0,0,0.2)' : 'none', whiteSpace: 'nowrap' }}>
                 <Icon size={14} />
                 {t.label}
               </button>
@@ -89,6 +91,9 @@ export default function DashboardPage() {
         {/* Tab content */}
         {!loading && !error && tab === 'snapshot' && (
           <TotalDuesSnapshot analyses={analyses} />
+        )}
+        {!loading && !error && tab === 'pdf_spend' && (
+          <PdfExpenditureSnapshot analyses={analyses} />
         )}
         {!loading && !error && tab === 'categories' && (
           <SpendCategorySnapshot analyses={analyses} />
