@@ -15,8 +15,9 @@ const STATUS_UI = {
   failed: { icon: XCircle, color: 'var(--red)', label: 'Failed' },
 };
 
-function fmt(n, c = '$') {
-  return `${c}${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+function fmt(n, c = '₹') {
+  const locale = c === '₹' ? 'en-IN' : 'en-US';
+  return `${c}${Number(n || 0).toLocaleString(locale, { minimumFractionDigits: 2 })}`;
 }
 
 export default function BatchUploadPage() {
@@ -87,6 +88,10 @@ export default function BatchUploadPage() {
   const pendingCount = queue.filter(q => q.status === S.pending).length;
   const totalDebit = queue.filter(q => q.result).reduce((s, q) => s + Number(q.result.total_debit || 0), 0);
   const totalCredit = queue.filter(q => q.result).reduce((s, q) => s + Number(q.result.total_credit || 0), 0);
+
+  // Detect active currency symbol from successfully completed items, default to rupees
+  const firstDoneWithCurrency = queue.find(q => q.status === S.done && q.result?.currency);
+  const activeCurrency = firstDoneWithCurrency ? firstDoneWithCurrency.result.currency : '₹';
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
@@ -169,18 +174,18 @@ export default function BatchUploadPage() {
           <div className="card p-24 mb-24 stagger-children" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px,1fr))', gap: 16 }}>
             <div className="stat-card red" style={{ margin: 0 }}>
               <div className="stat-label">Total Spent</div>
-              <div className="stat-value" style={{ fontSize: '1.3rem' }}>{fmt(totalDebit)}</div>
+              <div className="stat-value" style={{ fontSize: '1.3rem' }}>{fmt(totalDebit, activeCurrency)}</div>
               <div className="stat-sub">All files · debits</div>
             </div>
             <div className="stat-card emerald" style={{ margin: 0 }}>
               <div className="stat-label">Total Income</div>
-              <div className="stat-value" style={{ fontSize: '1.3rem' }}>{fmt(totalCredit)}</div>
+              <div className="stat-value" style={{ fontSize: '1.3rem' }}>{fmt(totalCredit, activeCurrency)}</div>
               <div className="stat-sub">All files · credits</div>
             </div>
             <div className="stat-card blue" style={{ margin: 0 }}>
               <div className="stat-label">Net Balance</div>
               <div className="stat-value" style={{ fontSize: '1.3rem', color: totalCredit - totalDebit >= 0 ? 'var(--emerald)' : 'var(--red)' }}>
-                {fmt(Math.abs(totalCredit - totalDebit))}{totalCredit - totalDebit >= 0 ? ' ▲' : ' ▼'}
+                {fmt(Math.abs(totalCredit - totalDebit), activeCurrency)}{totalCredit - totalDebit >= 0 ? ' ▲' : ' ▼'}
               </div>
               <div className="stat-sub">Income minus spent</div>
             </div>
