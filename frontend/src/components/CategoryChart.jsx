@@ -20,10 +20,11 @@ const CATEGORY_COLORS = {
 };
 
 function formatAmount(amount, currency) {
-  return `${currency}${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const locale = currency === '₹' ? 'en-IN' : 'en-US';
+  return `${currency}${Number(amount).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-export default function CategoryChart({ categorySummary, currency = '$' }) {
+export default function CategoryChart({ categorySummary, currency = '₹' }) {
   const entries = Object.entries(categorySummary).filter(([, v]) => v > 0);
   const total = entries.reduce((s, [, v]) => s + Number(v), 0);
 

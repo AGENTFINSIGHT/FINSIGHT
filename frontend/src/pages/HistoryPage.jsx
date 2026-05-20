@@ -7,7 +7,10 @@ import { fetchHistory, fetchAnalysisById, deleteAnalysis } from '../utils/apiCli
 const TYPE_ICON  = { pdf: FileText, image: Image, text: Type };
 const TYPE_COLOR = { pdf: 'var(--red)', image: 'var(--purple)', text: 'var(--blue)' };
 
-function fmt(n, c = '$') { return `${c}${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })}`; }
+function fmt(n, c = '₹') {
+  const locale = c === '₹' ? 'en-IN' : 'en-US';
+  return `${c}${Number(n).toLocaleString(locale, { minimumFractionDigits: 2 })}`;
+}
 function fmtDate(iso) { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
 
 export default function HistoryPage() {
@@ -31,7 +34,7 @@ export default function HistoryPage() {
   const exportCSV = async (a) => {
     const full = await fetchAnalysisById(a.id);
     if (!full) return;
-    const { transactions = [], total_debit = 0, total_credit = 0, currency = '$' } = full.result_json;
+    const { transactions = [], total_debit = 0, total_credit = 0, currency = '₹' } = full.result_json;
 
     // Build CSV rows
     const rows = [

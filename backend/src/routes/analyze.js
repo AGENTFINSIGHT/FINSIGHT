@@ -56,7 +56,7 @@ CURRENCY DETECTION — CRITICAL:
 Return EXACTLY this JSON schema:
 {
   "card_number": "XXXXXXXXXXXX1234",
-  "currency": "$",
+  "currency": "₹",
   "transactions": [{ "date": "YYYY-MM-DD", "description": "merchant name", "amount": 0.00, "type": "credit|debit", "category": "Food|Fuel|Travel|Shopping|Bills|Entertainment|Healthcare|Others" }],
   "category_summary": { "Food":0,"Fuel":0,"Travel":0,"Shopping":0,"Bills":0,"Entertainment":0,"Healthcare":0,"Others":0 },
   "total_debit": 0.00,
@@ -314,7 +314,7 @@ async function saveAnalysis(userId, fileName, fileType, fileUrl, result) {
     file_name: fileName,
     file_type: fileType,
     file_url: fileUrl || null,
-    currency: result.currency || '$',
+    currency: result.currency || '₹',
     total_debit: result.total_debit || 0,
     total_credit: result.total_credit || 0,
     txn_count: result.transactions?.length || 0,

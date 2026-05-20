@@ -4,10 +4,11 @@ import { ArrowUpDown, ArrowUp, ArrowDown, Search, Filter } from 'lucide-react';
 const CATEGORIES = ['All', 'Food', 'Fuel', 'Travel', 'Shopping', 'Bills', 'Entertainment', 'Healthcare', 'Others'];
 
 function formatAmount(amount, currency) {
-  return `${currency}${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const locale = currency === '₹' ? 'en-IN' : 'en-US';
+  return `${currency}${Number(amount).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-export default function TransactionsTable({ transactions, currency = '$' }) {
+export default function TransactionsTable({ transactions, currency = '₹' }) {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [typeFilter, setTypeFilter] = useState('All');

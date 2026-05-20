@@ -103,7 +103,7 @@ export function mergeChunkResults(results) {
 
   const merged = {
     card_number: results[0].card_number || 'Unknown Card',
-    currency: results[0].currency || '$',
+    currency: results[0].currency || '₹',
     transactions: [],
     category_summary: {
       Food: 0, Fuel: 0, Travel: 0, Shopping: 0,
@@ -125,7 +125,7 @@ export function mergeChunkResults(results) {
     }
 
     // Currency — take first non-default
-    if (r.currency && r.currency !== '$') merged.currency = r.currency;
+    if (r.currency && r.currency !== '₹') merged.currency = r.currency;
 
     // Transactions — deduplicate
     for (const t of (r.transactions || [])) {

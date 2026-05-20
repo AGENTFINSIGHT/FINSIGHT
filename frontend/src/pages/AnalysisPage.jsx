@@ -14,8 +14,9 @@ function fmtDate(iso) {
   });
 }
 
-function fmt(n, c = '$') {
-  return `${c}${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+function fmt(n, c = '₹') {
+  const locale = c === '₹' ? 'en-IN' : 'en-US';
+  return `${c}${Number(n).toLocaleString(locale, { minimumFractionDigits: 2 })}`;
 }
 
 export default function AnalysisPage() {
@@ -34,7 +35,7 @@ export default function AnalysisPage() {
 
   const exportCSV = () => {
     if (!data) return;
-    const { transactions = [], currency = '$' } = data.result_json;
+    const { transactions = [], currency = '₹' } = data.result_json;
     // Recalculate from actual transactions to avoid AI summary-field errors
     const total_debit  = transactions.filter(t => t.type === 'debit') .reduce((s, t) => s + (Number(t.amount) || 0), 0);
     const total_credit = transactions.filter(t => t.type === 'credit').reduce((s, t) => s + (Number(t.amount) || 0), 0);
@@ -101,7 +102,7 @@ export default function AnalysisPage() {
             const txns   = data.result_json?.transactions || [];
             const spent  = txns.filter(t => t.type === 'debit') .reduce((s, t) => s + (Number(t.amount) || 0), 0);
             const income = txns.filter(t => t.type === 'credit').reduce((s, t) => s + (Number(t.amount) || 0), 0);
-            const cur    = data.result_json?.currency || '$';
+            const cur    = data.result_json?.currency || '₹';
             return (
               <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                 <div style={{ display: 'flex', gap: 20 }}>

@@ -2,8 +2,9 @@ import React, { useState, useMemo } from 'react';
 import { Clock, FileText, ChevronRight, Trash2, Search, X, ChevronLeft } from 'lucide-react';
 import { deleteAnalysis } from '../utils/apiClient';
 
-function fmt(n, c = '$') {
-  return `${c}${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+function fmt(n, c = '₹') {
+  const locale = c === '₹' ? 'en-IN' : 'en-US';
+  return `${c}${Number(n || 0).toLocaleString(locale, { minimumFractionDigits: 2 })}`;
 }
 
 export default function HistorySnapshot({ analyses, onDeleted }) {

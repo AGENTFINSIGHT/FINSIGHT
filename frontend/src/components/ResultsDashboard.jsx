@@ -18,13 +18,14 @@ const TABS = [
   { id: 'chat',         label: 'AI Chat',        icon: MessageSquare },
 ];
 
-function fmt(amount, currency = '$') {
-  return `${currency}${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function fmt(amount, currency = '₹') {
+  const locale = currency === '₹' ? 'en-IN' : 'en-US';
+  return `${currency}${Number(amount).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export default function ResultsDashboard({ data, onReset, apiKey, saved = false }) {
   const [activeTab, setActiveTab] = useState('transactions');
-  const currency = data.currency || '$';
+  const currency = data.currency || '₹';
 
   // Always derive totals from the transactions list — this prevents AI
   // hallucinations (e.g. reading "Previous Statement Dues" as a debit) from
