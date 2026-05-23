@@ -53,11 +53,7 @@ export default function ResultsDashboard({ data, onReset, apiKey, saved = false 
           <div className="stat-value">{fmt(totalDebit, currency)}</div>
           <div className="stat-sub flex items-center gap-4"><TrendingDown size={11} /> Total debits</div>
         </div>
-        <div className="stat-card emerald">
-          <div className="stat-label">Total Income</div>
-          <div className="stat-value">{fmt(totalCredit, currency)}</div>
-          <div className="stat-sub flex items-center gap-4"><TrendingUp size={11} /> Total credits</div>
-        </div>
+
         <div className="stat-card purple">
           <div className="stat-label">Transactions</div>
           <div className="stat-value">{txnCount}</div>

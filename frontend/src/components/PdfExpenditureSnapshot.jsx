@@ -148,8 +148,8 @@ export default function PdfExpenditureSnapshot({ analyses }) {
     );
   }
 
-  const YELLOW_BG = 'rgba(234,179,8,0.12)';
-  const YELLOW_TEXT = '#eab308';
+  const YELLOW_BG = 'var(--table-yellow-bg)';
+  const YELLOW_TEXT = 'var(--table-yellow-text)';
   const RED = 'var(--red)';
   const EMERALD = 'var(--emerald)';
 
@@ -161,22 +161,6 @@ export default function PdfExpenditureSnapshot({ analyses }) {
           <div className="stat-label">Total Spent</div>
           <div className="stat-value" style={{ fontSize: '1.2rem' }}>₹{fmtINR(colTotals.total_debit)}</div>
           <div className="stat-sub">{filteredRows.length} PDF{filteredRows.length !== 1 ? 's' : ''} · shown debits</div>
-        </div>
-        <div className="stat-card emerald" style={{ margin: 0 }}>
-          <div className="stat-label">Total Income</div>
-          <div className="stat-value" style={{ fontSize: '1.2rem' }}>₹{fmtINR(colTotals.total_credit)}</div>
-          <div className="stat-sub">Shown credits combined</div>
-        </div>
-        <div className="stat-card blue" style={{ margin: 0 }}>
-          <div className="stat-label">Net Balance</div>
-          <div className="stat-value" style={{
-            fontSize: '1.2rem',
-            color: colTotals.total_credit - colTotals.total_debit >= 0 ? EMERALD : RED,
-          }}>
-            ₹{fmtINR(Math.abs(colTotals.total_credit - colTotals.total_debit))}
-            {colTotals.total_credit - colTotals.total_debit >= 0 ? ' ▲' : ' ▼'}
-          </div>
-          <div className="stat-sub">Income minus spent</div>
         </div>
         <div className="stat-card purple" style={{ margin: 0 }}>
           <div className="stat-label">Top Category</div>
@@ -356,22 +340,7 @@ export default function PdfExpenditureSnapshot({ analyses }) {
               >
                 Total Spent {sortArrow('total_debit')}
               </th>
-              <th
-                style={{ 
-                  ...TH, 
-                  cursor: 'pointer', 
-                  minWidth: 110,
-                  position: 'sticky',
-                  top: 0,
-                  background: 'var(--bg-secondary)',
-                  color: EMERALD,
-                  zIndex: 10,
-                  borderBottom: '1px solid var(--border-subtle)',
-                }}
-                onClick={() => toggleSort('total_credit')}
-              >
-                Total Income {sortArrow('total_credit')}
-              </th>
+
             </tr>
           </thead>
           <tbody>
@@ -396,7 +365,7 @@ export default function PdfExpenditureSnapshot({ analyses }) {
                     textAlign: 'left',
                     position: 'sticky',
                     left: 0,
-                    background: ri % 2 === 0 ? 'var(--bg-card)' : '#1a1f2c',
+                    background: ri % 2 === 0 ? 'var(--bg-card)' : 'var(--table-stripe-alt)',
                     zIndex: 8,
                     maxWidth: 200,
                     borderBottom: '1px solid rgba(255,255,255,0.04)',
@@ -467,17 +436,7 @@ export default function PdfExpenditureSnapshot({ analyses }) {
                     {row.totalDebit > 0 ? `₹${fmtINR(row.totalDebit)}` : '—'}
                   </td>
 
-                  {/* Total credit */}
-                  <td style={{ 
-                    ...TD, 
-                    background: ri % 2 === 0 ? 'rgba(34,197,94,0.03)' : 'rgba(34,197,94,0.06)', 
-                    fontFamily: 'JetBrains Mono, monospace', 
-                    fontWeight: 700, 
-                    color: row.totalCredit > 0 ? EMERALD : 'var(--text-muted)',
-                    borderBottom: '1px solid rgba(255,255,255,0.04)',
-                  }}>
-                    {row.totalCredit > 0 ? `₹${fmtINR(row.totalCredit)}` : '—'}
-                  </td>
+
                 </tr>
               );
             })}
@@ -486,7 +445,7 @@ export default function PdfExpenditureSnapshot({ analyses }) {
             <tr style={{ 
               position: 'sticky', 
               bottom: 0, 
-              background: '#141822', 
+              background: 'var(--table-footer-bg)', 
               zIndex: 11,
               boxShadow: '0 -4px 12px rgba(0,0,0,0.3)'
             }}>
@@ -496,7 +455,7 @@ export default function PdfExpenditureSnapshot({ analyses }) {
                 position: 'sticky', 
                 left: 0, 
                 bottom: 0, 
-                background: '#141822', 
+                background: 'var(--table-footer-bg)', 
                 zIndex: 13, 
                 fontWeight: 800, 
                 color: YELLOW_TEXT,
@@ -511,7 +470,7 @@ export default function PdfExpenditureSnapshot({ analyses }) {
                   fontWeight: 700, 
                   color: colTotals[c] > 0 ? 'var(--text-primary)' : 'var(--text-muted)',
                   borderTop: '2px solid rgba(234,179,8,0.25)',
-                  background: '#141822'
+                  background: 'var(--table-footer-bg)'
                 }}>
                   {colTotals[c] > 0 ? `₹${fmtINR(colTotals[c])}` : '—'}
                 </td>
@@ -526,16 +485,7 @@ export default function PdfExpenditureSnapshot({ analyses }) {
               }}>
                 ₹{fmtINR(colTotals.total_debit)}
               </td>
-              <td style={{ 
-                ...TD, 
-                fontFamily: 'JetBrains Mono, monospace', 
-                fontWeight: 800, 
-                color: EMERALD,
-                borderTop: '2px solid rgba(234,179,8,0.25)',
-                background: 'rgba(34,197,94,0.12)'
-              }}>
-                ₹{fmtINR(colTotals.total_credit)}
-              </td>
+
             </tr>
           </tbody>
         </table>

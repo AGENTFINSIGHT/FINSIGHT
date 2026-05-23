@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, useNavigate, Navigate } from 'react-router-dom';
-import { Brain, Zap, BarChart3, Shield, MessageSquare, LayoutDashboard, LogOut, User, AlertCircle, FolderOpen, Menu, X } from 'lucide-react';
+import { Brain, Zap, BarChart3, Shield, MessageSquare, LayoutDashboard, LogOut, User, AlertCircle, FolderOpen, Menu, X, Sun, Moon } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { BatchProvider } from './contexts/BatchContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -19,6 +19,19 @@ function Header() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [theme, setTheme] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('finsight-theme') || 'dark';
+    }
+    return 'dark';
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('finsight-theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark');
   const handleSignOut = async () => { await signOut(); navigate('/login'); setMenuOpen(false); };
 
   return (
@@ -57,6 +70,14 @@ function Header() {
             <div className="dot-green" />
             <span>AI Online</span>
           </div>
+          <button
+            className="theme-toggle"
+            onClick={toggleTheme}
+            aria-label="Toggle theme"
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
         </nav>
 
         {/* Mobile hamburger */}
@@ -97,6 +118,14 @@ function Header() {
           <div className="mobile-nav-status">
             <div className="dot-green" />
             <span>AI Online</span>
+            <button
+              className="theme-toggle"
+              onClick={toggleTheme}
+              aria-label="Toggle theme"
+              style={{ marginLeft: 'auto' }}
+            >
+              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
           </div>
         </div>
       )}

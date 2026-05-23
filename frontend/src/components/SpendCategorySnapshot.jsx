@@ -168,7 +168,7 @@ export default function SpendCategorySnapshot({ analyses }) {
   };
 
   const YELLOW_BG = 'rgba(234,179,8,0.12)';
-  const YELLOW_TEXT = '#eab308';
+  const YELLOW_TEXT = 'var(--table-yellow-text)';
   const BLUE = 'var(--blue)';
   const isCustom = (cat) => customCats.some(c => c.name === cat);
 
@@ -342,7 +342,7 @@ export default function SpendCategorySnapshot({ analyses }) {
               );
             })}
             {/* Totals row - sticky at bottom */}
-            <tr style={{ background: '#1e1c15' }}>
+            <tr style={{ background: 'var(--table-grand-bg)' }}>
               <td style={{
                 ...TD,
                 textAlign: 'left',
@@ -350,7 +350,7 @@ export default function SpendCategorySnapshot({ analyses }) {
                 bottom: 0,
                 left: 0,
                 zIndex: 12,
-                background: '#1e1c15',
+                background: 'var(--table-grand-bg)',
                 borderTop: '2px solid rgba(234,179,8,0.25)',
                 width: 130,
                 minWidth: 130,
@@ -365,7 +365,7 @@ export default function SpendCategorySnapshot({ analyses }) {
                 bottom: 0,
                 left: 130,
                 zIndex: 12,
-                background: '#1e1c15',
+                background: 'var(--table-grand-bg)',
                 borderTop: '2px solid rgba(234,179,8,0.25)',
                 width: 160,
                 minWidth: 160,
@@ -380,7 +380,7 @@ export default function SpendCategorySnapshot({ analyses }) {
                   position: 'sticky',
                   bottom: 0,
                   zIndex: 10,
-                  background: '#1e1c15',
+                  background: 'var(--table-grand-bg)',
                   borderTop: '2px solid rgba(234,179,8,0.25)',
                 }}>
                   {fmtINR(colTotals[c] || 0)}
@@ -394,7 +394,7 @@ export default function SpendCategorySnapshot({ analyses }) {
                 position: 'sticky',
                 bottom: 0,
                 zIndex: 10,
-                background: '#1e1c15',
+                background: 'var(--table-grand-bg)',
                 borderTop: '2px solid rgba(234,179,8,0.25)',
               }}>{fmtINR(grandTotal)}</td>
             </tr>

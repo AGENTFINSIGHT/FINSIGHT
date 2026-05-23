@@ -172,22 +172,10 @@ export default function BatchUploadPage() {
         {/* Grand total summary (shown after any completions) */}
         {doneCount > 0 && (
           <div className="card p-24 mb-24 stagger-children" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px,1fr))', gap: 16 }}>
-            <div className="stat-card red" style={{ margin: 0 }}>
+          <div className="stat-card red" style={{ margin: 0 }}>
               <div className="stat-label">Total Spent</div>
               <div className="stat-value" style={{ fontSize: '1.3rem' }}>{fmt(totalDebit, activeCurrency)}</div>
               <div className="stat-sub">All files · debits</div>
-            </div>
-            <div className="stat-card emerald" style={{ margin: 0 }}>
-              <div className="stat-label">Total Income</div>
-              <div className="stat-value" style={{ fontSize: '1.3rem' }}>{fmt(totalCredit, activeCurrency)}</div>
-              <div className="stat-sub">All files · credits</div>
-            </div>
-            <div className="stat-card blue" style={{ margin: 0 }}>
-              <div className="stat-label">Net Balance</div>
-              <div className="stat-value" style={{ fontSize: '1.3rem', color: totalCredit - totalDebit >= 0 ? 'var(--emerald)' : 'var(--red)' }}>
-                {fmt(Math.abs(totalCredit - totalDebit), activeCurrency)}{totalCredit - totalDebit >= 0 ? ' ▲' : ' ▼'}
-              </div>
-              <div className="stat-sub">Income minus spent</div>
             </div>
             <div className="stat-card purple" style={{ margin: 0 }}>
               <div className="stat-label">Files Done</div>
@@ -253,7 +241,6 @@ export default function BatchUploadPage() {
                         {item.status === S.done && item.result && (
                           <p className="text-xs" style={{ color: 'var(--text-muted)', margin: '2px 0 0' }}>
                             Spent <span style={{ color: 'var(--red)' }}>{fmt(item.result.total_debit, item.result.currency)}</span>
-                            {' · '}Income <span style={{ color: 'var(--emerald)' }}>{fmt(item.result.total_credit, item.result.currency)}</span>
                             {' · '}{item.result.transactions?.length || 0} transactions
                           </p>
                         )}

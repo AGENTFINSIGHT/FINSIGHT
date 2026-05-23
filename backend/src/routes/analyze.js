@@ -13,7 +13,7 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
-// ── OpenRouter client ────────────────────────────────────────────
+// ── OpenRouter client (Primary key) ─────────────────────────────
 const openrouter = new OpenAI({
   baseURL: 'https://openrouter.ai/api/v1',
   apiKey: process.env.OPENROUTER_API_KEY,
@@ -22,6 +22,18 @@ const openrouter = new OpenAI({
     'X-Title': 'FinSight AI',
   },
 });
+
+// ── OpenRouter client (Fallback — Thaibeen's api key) ───────────
+const openrouterFallback = process.env.OPENROUTER_API_KEY_FALLBACK
+  ? new OpenAI({
+      baseURL: 'https://openrouter.ai/api/v1',
+      apiKey: process.env.OPENROUTER_API_KEY_FALLBACK,
+      defaultHeaders: {
+        'HTTP-Referer': 'https://finsight-ai.app',
+        'X-Title': 'FinSight AI',
+      },
+    })
+  : null;
 
 // ── Free text models (quota-optimized: only the 5 most reliable) ──
 // Keeping this short saves OpenRouter daily-quota when models are down.
@@ -243,7 +255,7 @@ function cacheSet(key, value) {
 }
 
 // ── AI call with fallback chain + exponential backoff ───────────────
-async function callAIWithFallback(messages, modelChain, validator = null) {
+async function callAIWithFallbackUsingClient(client, clientLabel, messages, modelChain, validator = null) {
   let lastErr;
   const maxAttempts = 3;
 
@@ -251,9 +263,9 @@ async function callAIWithFallback(messages, modelChain, validator = null) {
     for (let i = 0; i < modelChain.length; i++) {
       const model = modelChain[i];
       try {
-        console.log(`🤖 Trying model: ${model} (attempt ${attempt + 1}/${maxAttempts})`);
+        console.log(`🤖 [${clientLabel}] Trying model: ${model} (attempt ${attempt + 1}/${maxAttempts})`);
         const resp = await withTimeout(
-          openrouter.chat.completions.create({
+          client.chat.completions.create({
             model,
             messages,
             temperature: 0.1,
@@ -266,7 +278,7 @@ async function callAIWithFallback(messages, modelChain, validator = null) {
 
         if (validator) validator(text);
 
-        console.log(`✅ Success with: ${model} (${text.length} chars)`);
+        console.log(`✅ [${clientLabel}] Success with: ${model} (${text.length} chars)`);
         return text;
       } catch (err) {
         lastErr = err;
@@ -282,16 +294,16 @@ async function callAIWithFallback(messages, modelChain, validator = null) {
           err.message?.includes('No endpoints found');
 
         if (isInvalid) {
-          console.warn(`⛔  ${model} invalid/removed — skipping immediately…`);
-          continue; // Skip to next model in the chain
+          console.warn(`⛔  [${clientLabel}] ${model} invalid/removed — skipping immediately…`);
+          continue;
         }
 
         if (isRateLimit) {
           const delay = Math.round(backoffDelay(i + attempt * 2));
-          console.warn(`⚠️  ${model} rate-limited/timeout — waiting ${delay}ms before trying next…`);
+          console.warn(`⚠️  [${clientLabel}] ${model} rate-limited/timeout — waiting ${delay}ms before trying next…`);
           await new Promise(r => setTimeout(r, delay));
         } else {
-          console.warn(`⚠️  ${model} failed (${err.message}) — trying next model…`);
+          console.warn(`⚠️  [${clientLabel}] ${model} failed (${err.message}) — trying next model…`);
           await new Promise(r => setTimeout(r, 1000));
         }
       }
@@ -300,11 +312,32 @@ async function callAIWithFallback(messages, modelChain, validator = null) {
     // If we completed the full chain but failed, wait a bit before the next full attempt
     if (attempt < maxAttempts - 1) {
       const cooldown = 3000 * (attempt + 1);
-      console.warn(`🔄 Completed full chain but failed. Waiting ${cooldown}ms cooldown before full retry attempt ${attempt + 2}…`);
+      console.warn(`🔄 [${clientLabel}] Completed full chain but failed. Waiting ${cooldown}ms cooldown before full retry attempt ${attempt + 2}…`);
       await new Promise(r => setTimeout(r, cooldown));
     }
   }
   throw lastErr;
+}
+
+/**
+ * Wrapper: tries the primary API key first; if all models/attempts fail,
+ * automatically retries the entire chain with Thaibeen's fallback API key.
+ */
+async function callAIWithFallback(messages, modelChain, validator = null) {
+  try {
+    return await callAIWithFallbackUsingClient(openrouter, 'Primary Key', messages, modelChain, validator);
+  } catch (primaryErr) {
+    if (openrouterFallback) {
+      console.warn(`🔑 Primary API key exhausted/failed. Switching to Thaibeen's fallback key…`);
+      try {
+        return await callAIWithFallbackUsingClient(openrouterFallback, "Thaibeen's Key", messages, modelChain, validator);
+      } catch (fallbackErr) {
+        console.error(`❌ Both API keys failed. Primary: ${primaryErr.message} | Fallback: ${fallbackErr.message}`);
+        throw fallbackErr;
+      }
+    }
+    throw primaryErr;
+  }
 }
 
 // ── Supabase save ────────────────────────────────────────────────

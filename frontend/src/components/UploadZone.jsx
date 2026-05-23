@@ -86,7 +86,7 @@ export default function UploadZone({ onTextReady, onImageReady, loading }) {
           ) : (
             <div>
               <div style={{ position: 'relative', borderRadius: 'var(--radius-lg)', overflow: 'hidden', border: '1px solid var(--border-subtle)', marginBottom: 14 }}>
-                <img src={imgPreview} alt="Statement" style={{ width: '100%', maxHeight: 300, objectFit: 'contain', background: '#0a0e1a', display: 'block' }} />
+                <img src={imgPreview} alt="Statement" style={{ width: '100%', maxHeight: 300, objectFit: 'contain', background: 'var(--bg-primary)', display: 'block' }} />
                 <button onClick={() => { setImgFile(null); setImgPreview(''); setFileName(''); }} style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 8, background: 'rgba(0,0,0,0.7)', border: '1px solid var(--border-subtle)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}><X size={14} /></button>
               </div>
               <p className="text-xs text-muted mb-16">📸 {fileName}</p>
