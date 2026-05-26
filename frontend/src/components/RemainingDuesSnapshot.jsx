@@ -57,6 +57,12 @@ export default function RemainingDuesSnapshot({ analyses }) {
 
       const totalDebitRound = Math.round(totalDebit * 100) / 100;
       const totalCreditRound = Math.round(totalCredit * 100) / 100;
+
+      // Use total_amount_due from statement header if the AI extracted it,
+      // otherwise fall back to the sum of debit transactions
+      const statementDue = Number(a.result_json?.total_amount_due) || 0;
+      const displayDue = statementDue > 0 ? statementDue : totalDebitRound;
+
       const remainingDue = Math.max(0, Math.round((totalDebitRound - totalCreditRound) * 100) / 100);
       const cardLabel = extractCardLabel(a);
 
@@ -67,6 +73,7 @@ export default function RemainingDuesSnapshot({ analyses }) {
         currency: a.currency || '₹',
         totalDebit: totalDebitRound,
         totalCredit: totalCreditRound,
+        displayDue,
         remainingDue,
         status: remainingDue === 0 ? 'Paid' : 'Unpaid',
         txnCount: txns.length,
@@ -99,7 +106,7 @@ export default function RemainingDuesSnapshot({ analyses }) {
         bv = b.fileName.toLowerCase();
         return av.localeCompare(bv) * sortDir;
       }
-      if (sortField === 'totalDebit') { av = a.totalDebit; bv = b.totalDebit; }
+      if (sortField === 'totalDebit') { av = a.displayDue; bv = b.displayDue; }
       else if (sortField === 'totalCredit') { av = a.totalCredit; bv = b.totalCredit; }
       else if (sortField === 'remainingDue') { av = a.remainingDue; bv = b.remainingDue; }
       else { av = a.uploadedAt; bv = b.uploadedAt; }
@@ -127,15 +134,13 @@ export default function RemainingDuesSnapshot({ analyses }) {
 
   // Column totals
   const colTotals = useMemo(() => {
-    const totals = { totalDebit: 0, totalCredit: 0 };
+    const totals = { displayDue: 0, totalCredit: 0 };
     filteredRows.forEach(r => {
-      totals.totalDebit += r.totalDebit;
+      totals.displayDue += r.displayDue;
       totals.totalCredit += r.totalCredit;
     });
-    totals.totalDebit = Math.round(totals.totalDebit * 100) / 100;
+    totals.displayDue = Math.round(totals.displayDue * 100) / 100;
     totals.totalCredit = Math.round(totals.totalCredit * 100) / 100;
-    // Consolidated remaining due is the global difference between total statement dues and payments
-    totals.remainingDue = Math.max(0, Math.round((totals.totalDebit - totals.totalCredit) * 100) / 100);
     return totals;
   }, [filteredRows]);
 
@@ -178,7 +183,7 @@ export default function RemainingDuesSnapshot({ analyses }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 320px)', gap: 16, marginBottom: 24 }}>
         <div className="stat-card red" style={{ margin: 0 }}>
           <div className="stat-label">Total Statement Dues</div>
-          <div className="stat-value" style={{ fontSize: '1.3rem' }}>₹{fmtINR(colTotals.totalDebit)}</div>
+          <div className="stat-value" style={{ fontSize: '1.3rem' }}>₹{fmtINR(colTotals.displayDue)}</div>
           <div className="stat-sub">{filteredRows.length} Statement{filteredRows.length !== 1 ? 's' : ''}</div>
         </div>
       </div>
@@ -449,7 +454,7 @@ export default function RemainingDuesSnapshot({ analyses }) {
                     color: 'var(--text-primary)',
                     fontWeight: 600
                   }}>
-                    ₹{fmtINR(row.totalDebit)}
+                    ₹{fmtINR(row.displayDue)}
                   </td>
                 </tr>
               );
@@ -484,7 +489,7 @@ export default function RemainingDuesSnapshot({ analyses }) {
                 borderTop: '2px solid rgba(234,179,8,0.25)',
                 background: 'rgba(234,179,8,0.15)'
               }}>
-                ₹{fmtINR(colTotals.totalDebit)}
+                ₹{fmtINR(colTotals.displayDue)}
               </td>
             </tr>
           </tbody>

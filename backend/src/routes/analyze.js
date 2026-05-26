@@ -69,6 +69,8 @@ Return EXACTLY this JSON schema:
 {
   "card_number": "XXXXXXXXXXXX1234",
   "currency": "₹",
+  "total_amount_due": 0.00,
+  "minimum_amount_due": 0.00,
   "transactions": [{ "date": "YYYY-MM-DD", "description": "merchant name", "amount": 0.00, "type": "credit|debit", "category": "Food|Fuel|Travel|Shopping|Bills|Entertainment|Healthcare|Others" }],
   "category_summary": { "Food":0,"Fuel":0,"Travel":0,"Shopping":0,"Bills":0,"Entertainment":0,"Healthcare":0,"Others":0 },
   "total_debit": 0.00,
@@ -80,6 +82,8 @@ Return EXACTLY this JSON schema:
 
 Rules:
 - card_number: Extract the credit/debit card number shown in the statement header or transaction rows (e.g. "6528XXXXXXXX5003"). If not found, use "Unknown Card".
+- total_amount_due: Extract the "Total Amount Due" / "New Balance" / "Total Due" / "Statement Balance" shown in the statement summary/header. This is the final outstanding amount the bank asks the customer to pay. It is NOT the sum of debits — it includes previous balance, fees, interest minus payments/credits. If not found, set to 0.
+- minimum_amount_due: Extract the "Minimum Amount Due" / "Minimum Due" shown in the statement summary. If not found, set to 0.
 - Normalize merchant names, remove duplicates, infer categories semantically.
 - Return raw JSON only — start with { and end with }.
 
