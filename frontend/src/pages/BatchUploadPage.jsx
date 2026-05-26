@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  FolderOpen, Upload, Play, CheckCircle2, XCircle,
+  FolderOpen, Folder, Upload, Play, CheckCircle2, XCircle,
   Clock, ChevronDown, ChevronUp, Download, Loader2,
   BarChart3, X, AlertCircle, RefreshCw
 } from 'lucide-react';
@@ -20,13 +20,67 @@ function fmt(n, c = '₹') {
   return `${c}${Number(n || 0).toLocaleString(locale, { minimumFractionDigits: 2 })}`;
 }
 
+// Recursively walk a directory entry to find all PDF files
+async function traverseFileTree(item) {
+  return new Promise((resolve) => {
+    if (item.isFile) {
+      if (item.name.toLowerCase().endsWith('.pdf')) {
+        item.file(
+          (file) => resolve([file]),
+          () => resolve([])
+        );
+      } else {
+        resolve([]);
+      }
+    } else if (item.isDirectory) {
+      const dirReader = item.createReader();
+      const allEntries = [];
+      
+      const readEntries = () => {
+        dirReader.readEntries(async (entries) => {
+          if (entries.length > 0) {
+            allEntries.push(...entries);
+            readEntries();
+          } else {
+            const files = [];
+            for (const entry of allEntries) {
+              const subFiles = await traverseFileTree(entry);
+              files.push(...subFiles);
+            }
+            resolve(files);
+          }
+        }, () => resolve([]));
+      };
+      
+      readEntries();
+    } else {
+      resolve([]);
+    }
+  });
+}
+
 export default function BatchUploadPage() {
   const { queue, running, addFiles, removeItem, clearDone, retryItem, runAll, stopAll } = useBatch();
   const [expanded, setExpanded] = useState(null);
   const [dragOver, setDragOver] = useState(false);
+  const [expandedFolders, setExpandedFolders] = useState({});
   const fileRef = useRef();
   const folderRef = useRef();
   const navigate = useNavigate();
+
+  // Automatically expand newly added folders
+  useEffect(() => {
+    const foldersInQueue = [...new Set(queue.map(item => item.folderPath || 'Direct Uploads'))];
+    setExpandedFolders(prev => {
+      const next = { ...prev };
+      foldersInQueue.forEach(folder => {
+        if (next[folder] === undefined) {
+          next[folder] = true; // default to expanded
+        }
+      });
+      return next;
+    });
+  }, [queue]);
 
   // webkitdirectory must be set imperatively — React does not support it as a JSX prop
   useEffect(() => {
@@ -93,6 +147,10 @@ export default function BatchUploadPage() {
   const firstDoneWithCurrency = queue.find(q => q.status === S.done && q.result?.currency);
   const activeCurrency = firstDoneWithCurrency ? firstDoneWithCurrency.result.currency : '₹';
 
+  const uploadedCount = queue.filter(q => q.uploadStatus === 'uploaded' || q.status === S.done).length;
+  const uploadPercent = queue.length > 0 ? Math.round((uploadedCount / queue.length) * 100) : 0;
+  const analyzePercent = queue.length > 0 ? Math.round((doneCount / queue.length) * 100) : 0;
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
       {/* Page header */}
@@ -125,7 +183,27 @@ export default function BatchUploadPage() {
           <div
             onDragOver={e => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
-            onDrop={e => { e.preventDefault(); setDragOver(false); addFiles(e.dataTransfer.files); }}
+            onDrop={async (e) => {
+              e.preventDefault();
+              setDragOver(false);
+              const items = e.dataTransfer.items;
+              if (items && items.length > 0) {
+                const filePromises = [];
+                for (let i = 0; i < items.length; i++) {
+                  const entry = items[i].webkitGetAsEntry();
+                  if (entry) {
+                    filePromises.push(traverseFileTree(entry));
+                  }
+                }
+                const filesArrays = await Promise.all(filePromises);
+                const allFiles = filesArrays.flat();
+                if (allFiles.length > 0) {
+                  addFiles(allFiles);
+                }
+              } else {
+                addFiles(e.dataTransfer.files);
+              }
+            }}
             style={{
               border: `2px dashed ${dragOver ? 'var(--blue)' : 'var(--border-subtle)'}`,
               borderRadius: 'var(--radius-lg)', padding: '40px 32px', textAlign: 'center',
@@ -210,88 +288,227 @@ export default function BatchUploadPage() {
               </div>
             </div>
 
-            {/* Progress bar */}
+            {/* Dual Progress Bars */}
             {(running || doneCount + failedCount > 0) && (
-              <div style={{ height: 4, background: 'var(--border-subtle)', borderRadius: 99, marginBottom: 16, overflow: 'hidden' }}>
-                <div style={{
-                  height: '100%', borderRadius: 99,
-                  width: `${((doneCount + failedCount) / queue.length) * 100}%`,
-                  background: failedCount > 0 ? 'linear-gradient(90deg, var(--emerald), var(--amber))' : 'var(--gradient-primary)',
-                  transition: 'width 0.5s ease',
-                }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 20, padding: '16px 20px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-subtle)', borderRadius: 12 }}>
+                {/* Upload Progress */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, fontSize: '0.78rem' }}>
+                    <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>1. Text Extraction & Storage Upload Progress</span>
+                    <span style={{ fontWeight: 700, color: 'var(--blue)' }}>{uploadPercent}%</span>
+                  </div>
+                  <div style={{ height: 6, background: 'rgba(255,255,255,0.05)', borderRadius: 99, overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%', borderRadius: 99,
+                      width: `${uploadPercent}%`,
+                      background: 'linear-gradient(90deg, #60a5fa, #3b82f6)',
+                      transition: 'width 0.4s ease',
+                    }} />
+                  </div>
+                </div>
+
+                {/* AI Analysis Progress */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, fontSize: '0.78rem' }}>
+                    <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>2. Gemini AI Financial Analysis Progress</span>
+                    <span style={{ fontWeight: 700, color: 'var(--emerald)' }}>{analyzePercent}%</span>
+                  </div>
+                  <div style={{ height: 6, background: 'rgba(255,255,255,0.05)', borderRadius: 99, overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%', borderRadius: 99,
+                      width: `${analyzePercent}%`,
+                      background: failedCount > 0 ? 'linear-gradient(90deg, var(--emerald), var(--amber))' : 'linear-gradient(90deg, #34d399, #10b981)',
+                      transition: 'width 0.4s ease',
+                    }} />
+                  </div>
+                </div>
               </div>
             )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {queue.map(item => {
-                const { icon: StatusIcon, color, label } = STATUS_UI[item.status];
-                const isExpanded = expanded === item.id;
-                return (
-                  <div key={item.id} className="card" style={{ overflow: 'hidden' }}>
-                    {/* File row */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px' }}>
-                      <StatusIcon size={18} color={color} style={item.status === S.analyzing ? { animation: 'spin 1s linear infinite' } : {}} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ fontWeight: 600, margin: 0, fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</p>
-                        {item.status === S.analyzing && item.progress && (
-                          <p className="text-xs" style={{ color: 'var(--blue)', margin: '2px 0 0' }}>
-                            {item.progress}
-                          </p>
-                        )}
-                        {item.status === S.done && item.result && (
-                          <p className="text-xs" style={{ color: 'var(--text-muted)', margin: '2px 0 0' }}>
-                            Spent <span style={{ color: 'var(--red)' }}>{fmt(item.result.total_debit, item.result.currency)}</span>
-                            {' · '}{item.result.transactions?.length || 0} transactions
-                          </p>
-                        )}
-                        {item.status === S.failed && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                            <p className="text-xs" style={{ color: 'var(--red)', margin: 0 }}>
-                              {item.error}
-                            </p>
-                            <button
-                              className="btn btn-ghost btn-sm"
-                              style={{ fontSize: '0.7rem', color: 'var(--blue)', padding: '2px 8px' }}
-                              onClick={() => retryItem(item.id)}
-                            >
-                              <RefreshCw size={12} style={{ marginRight: 4 }} /> Retry
+            {/* Group queue by folderPath */}
+            {(() => {
+              const groupedQueue = {};
+              queue.forEach(item => {
+                const folderKey = item.folderPath || 'Direct Uploads';
+                if (!groupedQueue[folderKey]) {
+                  groupedQueue[folderKey] = [];
+                }
+                groupedQueue[folderKey].push(item);
+              });
+
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {Object.entries(groupedQueue).map(([folderName, items]) => {
+                    const isFolderExpanded = expandedFolders[folderName];
+                    const doneCount = items.filter(item => item.status === S.done).length;
+                    const failedCount = items.filter(item => item.status === S.failed).length;
+                    const folderPercent = items.length > 0 ? Math.round((doneCount / items.length) * 100) : 0;
+                    const hasFailed = failedCount > 0;
+
+                    return (
+                      <div key={folderName} className="card" style={{ padding: 0, overflow: 'hidden', border: '1px solid var(--border-subtle)', background: 'rgba(255, 255, 255, 0.01)' }}>
+                        {/* Folder Header */}
+                        <div 
+                          onClick={() => setExpandedFolders(prev => ({ ...prev, [folderName]: !prev[folderName] }))}
+                          style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'space-between', 
+                            padding: '16px 20px', 
+                            background: 'var(--bg-secondary)', 
+                            cursor: 'pointer',
+                            userSelect: 'none',
+                            borderBottom: isFolderExpanded ? '1px solid var(--border-subtle)' : 'none',
+                            transition: 'background 0.2s',
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'var(--bg-secondary)'}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+                            <div style={{ 
+                              width: 36, 
+                              height: 36, 
+                              borderRadius: 10, 
+                              background: 'var(--blue-glow)', 
+                              border: '1px solid rgba(99,179,237,0.2)', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center',
+                              flexShrink: 0
+                            }}>
+                              {isFolderExpanded ? (
+                                <FolderOpen size={18} color="var(--blue)" />
+                              ) : (
+                                <Folder size={18} color="var(--blue)" />
+                              )}
+                            </div>
+                            <div style={{ minWidth: 0 }}>
+                              <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {folderName}
+                              </h4>
+                              <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                                {items.length} PDF{items.length !== 1 ? 's' : ''} • {doneCount} completed {hasFailed && `• ${failedCount} failed`}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                            {/* Mini Folder Progress Bar */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: 140, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                              <div style={{ flex: 1, height: 5, background: 'rgba(255,255,255,0.05)', borderRadius: 99, overflow: 'hidden' }}>
+                                <div style={{ 
+                                  height: '100%', 
+                                  width: `${folderPercent}%`, 
+                                  background: hasFailed ? 'linear-gradient(90deg, var(--emerald), var(--amber))' : 'linear-gradient(90deg, var(--blue), var(--emerald))',
+                                  borderRadius: 99,
+                                  transition: 'width 0.4s ease'
+                                }} />
+                              </div>
+                              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: folderPercent === 100 ? 'var(--emerald)' : 'var(--text-secondary)', width: 34, textAlign: 'right' }}>
+                                {folderPercent}%
+                              </span>
+                            </div>
+                            
+                            <button className="btn btn-ghost btn-sm" style={{ padding: 4 }} onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedFolders(prev => ({ ...prev, [folderName]: !prev[folderName] }));
+                            }}>
+                              {isFolderExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                             </button>
-                            {item.error?.includes('scanned') && (
-                              <button
-                                className="btn btn-ghost btn-sm"
-                                style={{ fontSize: '0.7rem', color: 'var(--blue)', padding: '2px 8px' }}
-                                onClick={() => navigate('/')}
-                              >
-                                → Upload as Snapshot
-                              </button>
-                            )}
+                          </div>
+                        </div>
+
+                        {/* Folder Contents */}
+                        {isFolderExpanded && (
+                          <div style={{ 
+                            padding: '16px 20px', 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            gap: 12,
+                            borderLeft: '2px dashed var(--border-subtle)',
+                            marginLeft: '36px',
+                            marginTop: '12px',
+                            marginBottom: '12px',
+                            paddingLeft: '20px'
+                          }}>
+                            {items.map(item => {
+                              const { icon: StatusIcon, color, label } = STATUS_UI[item.status];
+                              const isExpanded = expanded === item.id;
+                              return (
+                                <div key={item.id} className="card" style={{ padding: 0, overflow: 'hidden', border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)' }}>
+                                  {/* File row */}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 18px' }}>
+                                    <StatusIcon size={16} color={color} style={item.status === S.analyzing ? { animation: 'spin 1s linear infinite' } : {}} />
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <p style={{ fontWeight: 600, margin: 0, fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {item.name}
+                                      </p>
+                                      {item.status === S.analyzing && item.progress && (
+                                        <p className="text-xs" style={{ color: 'var(--blue)', margin: '2px 0 0' }}>
+                                          {item.progress}
+                                        </p>
+                                      )}
+                                      {item.status === S.done && item.result && (
+                                        <p className="text-xs" style={{ color: 'var(--text-muted)', margin: '2px 0 0' }}>
+                                          Spent <span style={{ color: 'var(--red)' }}>{fmt(item.result.total_debit, item.result.currency)}</span>
+                                          {' · '}{item.result.transactions?.length || 0} transactions
+                                        </p>
+                                      )}
+                                      {item.status === S.failed && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                                          <p className="text-xs" style={{ color: 'var(--red)', margin: 0 }}>
+                                            {item.error}
+                                          </p>
+                                          <button
+                                            className="btn btn-ghost btn-sm"
+                                            style={{ fontSize: '0.7rem', color: 'var(--blue)', padding: '2px 8px' }}
+                                            onClick={() => retryItem(item.id)}
+                                          >
+                                            <RefreshCw size={12} style={{ marginRight: 4 }} /> Retry
+                                          </button>
+                                          {item.error?.includes('scanned') && (
+                                            <button
+                                              className="btn btn-ghost btn-sm"
+                                              style={{ fontSize: '0.7rem', color: 'var(--blue)', padding: '2px 8px' }}
+                                              onClick={() => navigate('/')}
+                                            >
+                                              → Upload as Snapshot
+                                            </button>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                    <span style={{ fontSize: '0.72rem', color, fontWeight: 600 }}>{label}</span>
+                                    {item.status === S.done && (
+                                      <button className="btn btn-ghost btn-sm" style={{ padding: '4px 8px', fontSize: '0.75rem' }} onClick={() => setExpanded(isExpanded ? null : item.id)}>
+                                        {isExpanded ? <ChevronUp size={12} style={{ marginRight: 4 }} /> : <ChevronDown size={12} style={{ marginRight: 4 }} />}
+                                        {isExpanded ? 'Hide' : 'View'}
+                                      </button>
+                                    )}
+                                    {(item.status === S.pending || item.status === S.failed) && !running && (
+                                      <button className="btn btn-ghost btn-sm" style={{ padding: 4 }} onClick={() => removeItem(item.id)}>
+                                        <X size={12} />
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  {/* Expanded analysis */}
+                                  {isExpanded && item.result && (
+                                    <div style={{ borderTop: '1px solid var(--border-subtle)', padding: 20, background: 'var(--bg-secondary)' }}>
+                                      <ResultsDashboard data={item.result} />
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
-                      <span style={{ fontSize: '0.75rem', color, fontWeight: 600 }}>{label}</span>
-                      {item.status === S.done && (
-                        <button className="btn btn-ghost btn-sm" onClick={() => setExpanded(isExpanded ? null : item.id)}>
-                          {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                          {isExpanded ? 'Hide' : 'View'}
-                        </button>
-                      )}
-                      {(item.status === S.pending || item.status === S.failed) && !running && (
-                        <button className="btn btn-ghost btn-sm" onClick={() => removeItem(item.id)}>
-                          <X size={13} />
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Expanded analysis */}
-                    {isExpanded && item.result && (
-                      <div style={{ borderTop: '1px solid var(--border-subtle)', padding: 24, background: 'var(--bg-secondary)' }}>
-                        <ResultsDashboard data={item.result} />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         )}
 

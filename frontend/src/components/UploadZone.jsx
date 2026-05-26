@@ -26,7 +26,7 @@ export default function UploadZone({ onTextReady, onImageReady, loading }) {
     try {
       const text = await extractTextFromPDF(file);
       if (!text.trim()) throw new Error('No text found. Try the Snapshot tab instead.');
-      onTextReady(text, file.name, 'pdf');
+      onTextReady(text, file.name, 'pdf', file);
     } catch (e) { setError(e.message); }
     finally { setExtracting(false); }
   };

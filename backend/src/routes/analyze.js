@@ -359,7 +359,14 @@ async function saveAnalysis(userId, fileName, fileType, fileUrl, result) {
 // ════════════════════════════════════════════════════════════════
 // POST /api/analyze/text
 // ════════════════════════════════════════════════════════════════
-router.post('/text', authMiddleware, async (req, res) => {
+router.post('/text', authMiddleware, (req, res, next) => {
+  const contentType = req.headers['content-type'] || '';
+  if (contentType.includes('multipart/form-data')) {
+    upload.single('file')(req, res, next);
+  } else {
+    next();
+  }
+}, async (req, res) => {
   try {
     const { text, fileName = 'statement.txt', fileType = 'text' } = req.body;
     if (!text?.trim()) return res.status(400).json({ error: 'text is required' });
@@ -372,6 +379,21 @@ router.post('/text', authMiddleware, async (req, res) => {
       return res.json(cached);
     }
 
+    // Upload file to Supabase Storage if present
+    let fileUrl = null;
+    if (req.file) {
+      const bucketName = fileType === 'pdf' ? 'statements' : 'snapshots';
+      const storagePath = `${req.user.id}/${Date.now()}_${req.file.originalname}`;
+      const { error: upErr } = await supabaseAdmin.storage
+        .from(bucketName)
+        .upload(storagePath, req.file.buffer, { contentType: req.file.mimetype, upsert: false });
+      if (!upErr) {
+        fileUrl = supabaseAdmin.storage.from(bucketName).getPublicUrl(storagePath).data?.publicUrl;
+      } else {
+        console.error('Supabase upload error:', upErr.message);
+      }
+    }
+
     const raw = await callAIWithFallback([
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: `Analyze this bank statement and return the JSON:\n\n${text}` },
@@ -379,7 +401,7 @@ router.post('/text', authMiddleware, async (req, res) => {
 
     const data = recalcTotals(parseJSON(raw));
     cacheSet(ck, data);  // store for next retry
-    await saveAnalysis(req.user.id, fileName, fileType, null, data);
+    await saveAnalysis(req.user.id, fileName, fileType, fileUrl, data);
     res.json(data);
   } catch (err) {
     console.error('Text analysis error:', err.message);

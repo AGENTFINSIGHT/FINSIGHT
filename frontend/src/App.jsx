@@ -169,7 +169,7 @@ function HomePage() {
             <h3 style={{ marginBottom: 6 }}>Upload Bank Statement</h3>
             <p className="text-sm text-muted" style={{ marginBottom: 24 }}>PDF · Image snapshot (PNG/JPG/WEBP) · OCR paste · $ USD &amp; ₹ INR supported</p>
             <UploadZone
-              onTextReady={(text, name, type) => run(() => analyzeText(text, name, type))}
+              onTextReady={(text, name, type, file) => run(() => analyzeText(text, name, type, file))}
               onImageReady={(file, name, type) => run(() => analyzeImage(file, name, type))}
               loading={stage === 'processing'}
             />

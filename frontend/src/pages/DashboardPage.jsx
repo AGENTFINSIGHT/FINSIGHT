@@ -7,10 +7,12 @@ import TotalDuesSnapshot from '../components/TotalDuesSnapshot';
 import SpendCategorySnapshot from '../components/SpendCategorySnapshot';
 import HistorySnapshot from '../components/HistorySnapshot';
 import PdfExpenditureSnapshot from '../components/PdfExpenditureSnapshot';
+import RemainingDuesSnapshot from '../components/RemainingDuesSnapshot';
 
 const TABS = [
   { key: 'snapshot',      label: 'Total Dues Snapshot',    icon: BarChart2   },
   { key: 'pdf_spend',     label: 'PDF Expenditure',        icon: FileStack   },
+  { key: 'remaining_due', label: 'Remaining Dues',        icon: AlertCircle },
   { key: 'categories',   label: 'Spend Category Snapshot', icon: Tag         },
   { key: 'history',      label: 'Upload History',          icon: Clock       },
 ];
@@ -94,6 +96,9 @@ export default function DashboardPage() {
         )}
         {!loading && !error && tab === 'pdf_spend' && (
           <PdfExpenditureSnapshot analyses={analyses} />
+        )}
+        {!loading && !error && tab === 'remaining_due' && (
+          <RemainingDuesSnapshot analyses={analyses} />
         )}
         {!loading && !error && tab === 'categories' && (
           <SpendCategorySnapshot analyses={analyses} />

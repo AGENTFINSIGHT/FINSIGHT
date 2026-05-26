@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock, FileText, Image, Type, Trash2, Eye, RefreshCw, AlertCircle, Download, FolderOpen } from 'lucide-react';
 import { fetchHistory, fetchAnalysisById, deleteAnalysis } from '../utils/apiClient';
+import { supabase } from '../lib/supabase.js';
 
 
 const TYPE_ICON  = { pdf: FileText, image: Image, text: Type };
@@ -104,8 +105,38 @@ export default function HistoryPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
                     <div style={{ width: 40, height: 40, borderRadius: 10, background: `${color}1a`, border: `1px solid ${color}33`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon size={18} color={color} /></div>
                     <div style={{ flex: 1, minWidth: 160 }}>
-                      <p style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2, fontSize: '0.9rem' }}>{a.file_name}</p>
-                      <p className="text-xs text-muted">{fmtDate(a.created_at)}</p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.9rem' }}>{a.file_name}</span>
+                        {a.file_url && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              supabase.auth.getSession().then(({ data: { session } }) => {
+                                const base = import.meta.env.VITE_API_URL || '';
+                                const downloadUrl = `${base}/api/history/${a.id}/file?token=${session?.access_token || ''}`;
+                                window.open(downloadUrl, '_blank');
+                              });
+                            }}
+                            title="Open Original File"
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              padding: 0,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              color: 'var(--blue)',
+                              opacity: 0.7,
+                              transition: 'opacity 0.2s',
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
+                            onMouseLeave={(e) => e.currentTarget.style.opacity = 0.7}
+                          >
+                            <Eye size={13} />
+                          </button>
+                        )}
+                      </div>
+                      <span className="text-xs text-muted" style={{ display: 'block', marginTop: 2 }}>{fmtDate(a.created_at)}</span>
                     </div>
                     <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
                       {[['SPENT', fmt(a.total_debit, a.currency), 'var(--red)'], ['INCOME', fmt(a.total_credit, a.currency), 'var(--emerald)'], ['TXNs', a.txn_count, 'var(--text-primary)']].map(([l, v, c]) => (

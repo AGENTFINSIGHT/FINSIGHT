@@ -17,13 +17,27 @@ export function BatchProvider({ children }) {
   }, [queue]);
 
   const addFiles = (files) => {
-    const pdfs = Array.from(files).filter(f => f.type === 'application/pdf');
+    const pdfs = Array.from(files).filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
     if (!pdfs.length) return;
     setQueue(prev => {
       const existingNames = new Set(prev.map(q => q.name));
       const newItems = pdfs
         .filter(f => !existingNames.has(f.name))
-        .map(f => ({ id: `${f.name}_${Math.random()}`, file: f, name: f.name, status: S.pending, result: null, error: null, progress: null }));
+        .map(f => {
+          const relativePath = f.webkitRelativePath || '';
+          const folderPath = relativePath.includes('/') ? relativePath.substring(0, relativePath.lastIndexOf('/')) : '';
+          return { 
+            id: `${f.name}_${Math.random()}`, 
+            file: f, 
+            name: f.name, 
+            folderPath,
+            status: S.pending, 
+            uploadStatus: 'pending', 
+            result: null, 
+            error: null, 
+            progress: null 
+          };
+        });
       return [...prev, ...newItems];
     });
   };
@@ -50,8 +64,8 @@ export function BatchProvider({ children }) {
    * chunks, each analyzed separately, then the results are merged.
    */
   const analyzeFile = async (item) => {
-    // Mark as analyzing
-    updateItem(item.id, { status: S.analyzing, progress: null });
+    // Mark as extracting
+    updateItem(item.id, { status: S.analyzing, progress: 'Extracting text…', uploadStatus: 'uploading' });
 
     // 1. Extract text
     const text = await extractTextFromPDF(item.file);
@@ -59,14 +73,17 @@ export function BatchProvider({ children }) {
 
     if (stopFlag.current) throw new Error('Stopped by user.');
 
+    // Update status to uploading PDF
+    updateItem(item.id, { progress: 'Uploading PDF to storage…' });
+
     // 2. Split into chunks if needed
     const chunks = splitIntoChunks(text);
     const totalChunks = chunks.length;
 
     if (totalChunks === 1) {
       // Fast path — small PDF, single request
-      updateItem(item.id, { progress: null }); // no chunk label needed
-      const result = await analyzeText(text, item.name, 'pdf');
+      const result = await analyzeText(text, item.name, 'pdf', item.file);
+      updateItem(item.id, { uploadStatus: 'uploaded' });
       return result;
     }
 
@@ -80,7 +97,7 @@ export function BatchProvider({ children }) {
       });
 
       const chunkLabel = `${item.name} [chunk ${i + 1}/${totalChunks}]`;
-      const result = await analyzeText(chunks[i], chunkLabel, 'pdf');
+      const result = await analyzeText(chunks[i], chunkLabel, 'pdf', item.file);
       chunkResults.push(result);
 
       // Small delay between chunk calls to reduce rate-limit pressure
@@ -88,6 +105,8 @@ export function BatchProvider({ children }) {
         await new Promise(r => setTimeout(r, 600));
       }
     }
+
+    updateItem(item.id, { uploadStatus: 'uploaded' });
 
     // 4. Merge all chunk results
     updateItem(item.id, { progress: 'Merging chunks…' });

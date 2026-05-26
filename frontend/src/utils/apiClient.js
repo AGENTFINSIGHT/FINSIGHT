@@ -12,11 +12,27 @@ async function authHeaders() {
   };
 }
 
-export async function analyzeText(text, fileName, fileType) {
+export async function analyzeText(text, fileName, fileType, file) {
+  const { data: { session } } = await supabase.auth.getSession();
+  const headers = { 'Authorization': `Bearer ${session?.access_token || ''}` };
+
+  let body;
+  if (file) {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('text', text);
+    form.append('fileName', fileName);
+    form.append('fileType', fileType);
+    body = form;
+  } else {
+    headers['Content-Type'] = 'application/json';
+    body = JSON.stringify({ text, fileName, fileType });
+  }
+
   const res = await fetch(`${BASE}/api/analyze/text`, {
     method: 'POST',
-    headers: await authHeaders(),
-    body: JSON.stringify({ text, fileName, fileType }),
+    headers,
+    body,
   });
   if (!res.ok) throw new Error((await res.json()).error || 'Analysis failed');
   return res.json();

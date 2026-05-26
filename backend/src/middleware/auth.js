@@ -7,7 +7,7 @@ const supabase = createClient(
 );
 
 export async function authMiddleware(req, res, next) {
-  const token = req.headers.authorization?.split('Bearer ')[1];
+  const token = req.headers.authorization?.split('Bearer ')[1] || req.query.token;
   if (!token) return res.status(401).json({ error: 'Authorization token required' });
 
   const { data: { user }, error } = await supabase.auth.getUser(token);

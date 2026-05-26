@@ -44,7 +44,7 @@ export default function TotalDuesSnapshot({ analyses }) {
 
   const cards = useMemo(() => getUniqueCards(analyses), [analyses]);
 
-  // matrix[monthKey][cardLabel] = { total: number, transactions: [] }
+  // matrix[monthKey][cardLabel] = { debit: number, credit: number, remaining: number, transactions: [] }
   const matrix = useMemo(() => {
     const m = {};
     chronologicalMonths.forEach(mo => { m[mo.key] = {}; });
@@ -53,9 +53,20 @@ export default function TotalDuesSnapshot({ analyses }) {
       (a.result_json?.transactions || []).forEach(t => {
         const mk = getMonthKey(t.date);
         if (!mk || !m[mk]) return;
-        if (!m[mk][card]) m[mk][card] = { total: 0, transactions: [] };
+        if (!m[mk][card]) m[mk][card] = { debit: 0, credit: 0, transactions: [] };
         m[mk][card].transactions.push(t);
-        if (t.type === 'debit') m[mk][card].total += Number(t.amount) || 0;
+        if (t.type === 'debit') m[mk][card].debit += Number(t.amount) || 0;
+        if (t.type === 'credit') m[mk][card].credit += Number(t.amount) || 0;
+      });
+    });
+
+    // Calculate remaining and round for each cell
+    Object.keys(m).forEach(mk => {
+      Object.keys(m[mk]).forEach(card => {
+        const cell = m[mk][card];
+        cell.debit = Math.round(cell.debit * 100) / 100;
+        cell.credit = Math.round(cell.credit * 100) / 100;
+        cell.remaining = Math.max(0, Math.round((cell.debit - cell.credit) * 100) / 100);
       });
     });
     return m;
@@ -63,17 +74,59 @@ export default function TotalDuesSnapshot({ analyses }) {
 
   const cardTotals = useMemo(() => {
     const ct = {};
-    cards.forEach(c => { ct[c] = chronologicalMonths.reduce((s, mo) => s + (matrix[mo.key]?.[c]?.total || 0), 0); });
+    cards.forEach(c => {
+      let debit = 0;
+      let remaining = 0;
+      chronologicalMonths.forEach(mo => {
+        const cell = matrix[mo.key]?.[c];
+        if (cell) {
+          debit += cell.debit || 0;
+          remaining += cell.remaining || 0;
+        }
+      });
+      ct[c] = {
+        debit: Math.round(debit * 100) / 100,
+        remaining: Math.round(remaining * 100) / 100
+      };
+    });
     return ct;
   }, [cards, chronologicalMonths, matrix]);
 
   const monthTotals = useMemo(() => {
     const mt = {};
-    chronologicalMonths.forEach(mo => { mt[mo.key] = cards.reduce((s, c) => s + (matrix[mo.key]?.[c]?.total || 0), 0); });
+    chronologicalMonths.forEach(mo => {
+      let debit = 0;
+      let remaining = 0;
+      cards.forEach(c => {
+        const cell = matrix[mo.key]?.[c];
+        if (cell) {
+          debit += cell.debit || 0;
+          remaining += cell.remaining || 0;
+        }
+      });
+      mt[mo.key] = {
+        debit: Math.round(debit * 100) / 100,
+        remaining: Math.round(remaining * 100) / 100
+      };
+    });
     return mt;
   }, [cards, chronologicalMonths, matrix]);
 
-  const grandTotal = useMemo(() => cards.reduce((s, c) => s + (cardTotals[c] || 0), 0), [cards, cardTotals]);
+  const grandTotal = useMemo(() => {
+    let debit = 0;
+    let remaining = 0;
+    cards.forEach(c => {
+      const ct = cardTotals[c];
+      if (ct) {
+        debit += ct.debit || 0;
+        remaining += ct.remaining || 0;
+      }
+    });
+    return {
+      debit: Math.round(debit * 100) / 100,
+      remaining: Math.round(remaining * 100) / 100
+    };
+  }, [cards, cardTotals]);
 
   // Dynamic grouping based on active mode (Calendar vs Fiscal)
   const groups = useMemo(() => {
@@ -233,10 +286,11 @@ export default function TotalDuesSnapshot({ analyses }) {
         const row = [
           { v: mo.label, s: monthCellStyle(isAlt) },
           ...cards.map(c => {
-            const val = matrix[mo.key]?.[c]?.total || 0;
-            return { v: val, t: 'n', s: val > 0 ? dataStyle(isAlt) : { ...dataStyle(isAlt), font: { ...dataStyle(isAlt).font, color: { rgb: 'C0C0C0' } } } };
+            const cell = matrix[mo.key]?.[c];
+            const dVal = cell?.debit || 0;
+            return { v: dVal, t: 'n', s: dVal > 0 ? dataStyle(isAlt) : { ...dataStyle(isAlt), font: { ...dataStyle(isAlt).font, color: { rgb: 'C0C0C0' } } } };
           }),
-          { v: monthTotals[mo.key] || 0, t: 'n', s: dataTotalStyle(isAlt) },
+          { v: monthTotals[mo.key]?.debit || 0, t: 'n', s: dataTotalStyle(isAlt) },
         ];
         wsData.push(row);
       });
@@ -245,14 +299,22 @@ export default function TotalDuesSnapshot({ analyses }) {
       if (showSeparators) {
         const groupCardTotals = {};
         cards.forEach(c => {
-          groupCardTotals[c] = groupMonths.reduce((s, mo) => s + (matrix[mo.key]?.[c]?.total || 0), 0);
+          let debit = 0;
+          groupMonths.forEach(mo => {
+            const cell = matrix[mo.key]?.[c];
+            if (cell) {
+              debit += cell.debit || 0;
+            }
+          });
+          groupCardTotals[c] = Math.round(debit * 100) / 100;
         });
-        const groupRowTotal = cards.reduce((s, c) => s + (groupCardTotals[c] || 0), 0);
+
+        let groupRowDebit = cards.reduce((s, c) => s + (groupCardTotals[c] || 0), 0);
 
         wsData.push([
           { v: `${groupKey} Total`, s: subtotalLabelStyle },
           ...cards.map(c => ({ v: groupCardTotals[c] || 0, t: 'n', s: subtotalStyle })),
-          { v: groupRowTotal, t: 'n', s: { ...subtotalStyle, font: { ...subtotalStyle.font, color: { rgb: '92400E' } } } },
+          { v: groupRowDebit, t: 'n', s: { ...subtotalStyle, font: { ...subtotalStyle.font, color: { rgb: '92400E' } } } },
         ]);
       }
     });
@@ -260,8 +322,8 @@ export default function TotalDuesSnapshot({ analyses }) {
     // Grand Total row
     wsData.push([
       { v: 'Grand Total', s: grandLabelStyle },
-      ...cards.map(c => ({ v: cardTotals[c] || 0, t: 'n', s: grandStyle })),
-      { v: grandTotal, t: 'n', s: { ...grandStyle, font: { bold: true, sz: 12, name: 'Calibri', color: { rgb: '92400E' } } } },
+      ...cards.map(c => ({ v: cardTotals[c]?.debit || 0, t: 'n', s: grandStyle })),
+      { v: grandTotal.debit, t: 'n', s: { ...grandStyle, font: { bold: true, sz: 12, name: 'Calibri', color: { rgb: '92400E' } } } },
     ]);
 
     // ── Create Workbook ────────────────────────────────────────
@@ -436,17 +498,36 @@ export default function TotalDuesSnapshot({ analyses }) {
             <tr style={{ background: 'var(--bg-secondary)' }}>
               <th style={stickyHeaderTh(true)}>Month</th>
               {cards.map(c => <th key={c} style={stickyHeaderTh(false)}>{c}</th>)}
-              <th style={{ ...stickyHeaderTh(false), background: 'var(--table-grand-total-bg)', color: YELLOW_TEXT }}>Total</th>
+              <th style={{ ...stickyHeaderTh(false), color: YELLOW_TEXT }}>Total</th>
             </tr>
           </thead>
           <tbody>
             {Object.keys(groups).map(groupKey => {
               const groupMonths = groups[groupKey];
+              
               const groupCardTotals = {};
               cards.forEach(c => {
-                groupCardTotals[c] = groupMonths.reduce((s, mo) => s + (matrix[mo.key]?.[c]?.total || 0), 0);
+                let debit = 0;
+                let remaining = 0;
+                groupMonths.forEach(mo => {
+                  const cell = matrix[mo.key]?.[c];
+                  if (cell) {
+                    debit += cell.debit || 0;
+                    remaining += cell.remaining || 0;
+                  }
+                });
+                groupCardTotals[c] = {
+                  debit: Math.round(debit * 100) / 100,
+                  remaining: Math.round(remaining * 100) / 100
+                };
               });
-              const groupRowTotal = cards.reduce((s, c) => s + (groupCardTotals[c] || 0), 0);
+
+              let groupRowDebitTotal = 0;
+              let groupRowRemainingTotal = 0;
+              cards.forEach(c => {
+                groupRowDebitTotal += groupCardTotals[c].debit;
+                groupRowRemainingTotal += groupCardTotals[c].remaining;
+              });
 
               return [
                 // Group separator row (e.g. Year 2025 or FY25-26)
@@ -475,25 +556,41 @@ export default function TotalDuesSnapshot({ analyses }) {
                 ),
                 // Month rows inside this group
                 ...groupMonths.map((mo, ri) => {
-                  const rowTotal = monthTotals[mo.key] || 0;
+                  const mTotal = monthTotals[mo.key];
+                  const debitTotal = mTotal?.debit || 0;
+                  const remainingTotal = mTotal?.remaining || 0;
                   const rowBg = ri % 2 === 0 ? 'transparent' : 'var(--table-stripe-alt2)';
                   return (
                     <tr key={mo.key} style={{ background: rowBg }}>
                       <td style={stickyMonthTd(ri)}>{mo.label}</td>
                       {cards.map(c => {
                         const cell = matrix[mo.key]?.[c];
-                        const val = cell?.total || 0;
+                        const debit = cell?.debit || 0;
+                        const remaining = cell?.remaining || 0;
+                        const hasTxns = cell?.transactions && cell.transactions.length > 0;
                         return (
-                          <td key={c} style={{ ...rowTd(ri), cursor: val > 0 ? 'pointer' : 'default' }}
-                            onClick={() => val > 0 && setModal({ title: `${c} · ${mo.label}`, transactions: cell.transactions })}>
-                            {val > 0
-                              ? <span style={{ color: BLUE, fontFamily: 'JetBrains Mono, monospace', fontWeight: 600, textDecoration: 'underline dotted' }}>{fmtINR(val)}</span>
-                              : <span style={{ color: 'var(--text-muted)' }}>-</span>}
+                          <td key={c} style={{ ...rowTd(ri), padding: '8px 14px' }}>
+                            {hasTxns ? (
+                              <span 
+                                style={{ color: BLUE, fontWeight: 600, textDecoration: 'underline dotted', cursor: 'pointer' }}
+                                onClick={() => setModal({ title: `${c} · ${mo.label}`, transactions: cell.transactions })}
+                              >
+                                {fmtINR(debit)}
+                              </span>
+                            ) : (
+                              <span style={{ color: 'var(--text-muted)' }}>-</span>
+                            )}
                           </td>
                         );
                       })}
-                      <td style={{ ...rowTd(ri), background: YELLOW_BG, fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, color: rowTotal > 0 ? YELLOW_TEXT : 'var(--text-muted)' }}>
-                        {fmtINR(rowTotal)}
+                      <td style={{ ...rowTd(ri), background: YELLOW_BG, padding: '8px 14px' }}>
+                        {debitTotal > 0 ? (
+                          <span style={{ fontWeight: 700, color: YELLOW_TEXT }}>
+                            {fmtINR(debitTotal)}
+                          </span>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>-</span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -516,27 +613,38 @@ export default function TotalDuesSnapshot({ analyses }) {
                     }}>
                       {groupKey} Total
                     </td>
-                    {cards.map(c => (
-                      <td key={c} style={{
-                        ...TD,
-                        fontFamily: 'JetBrains Mono, monospace',
-                        fontWeight: 700,
-                        color: groupCardTotals[c] > 0 ? 'var(--text-primary)' : 'var(--text-muted)',
-                        borderBottom: '2px solid var(--table-row-border)',
-                        borderTop: '1px solid var(--table-row-border)',
-                      }}>
-                        {fmtINR(groupCardTotals[c] || 0)}
-                      </td>
-                    ))}
+                    {cards.map(c => {
+                      const val = groupCardTotals[c];
+                      return (
+                        <td key={c} style={{
+                          ...TD,
+                          padding: '8px 14px',
+                          borderBottom: '2px solid var(--table-row-border)',
+                          borderTop: '1px solid var(--table-row-border)',
+                        }}>
+                          {val.debit > 0 ? (
+                            <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+                              {fmtINR(val.debit)}
+                            </span>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)' }}>-</span>
+                          )}
+                        </td>
+                      );
+                    })}
                     <td style={{
                       ...TD,
-                      fontFamily: 'JetBrains Mono, monospace',
-                      fontWeight: 700,
-                      color: groupRowTotal > 0 ? YELLOW_TEXT : 'var(--text-muted)',
+                      padding: '8px 14px',
                       borderBottom: '2px solid var(--table-row-border)',
                       borderTop: '1px solid var(--table-row-border)',
                     }}>
-                      {fmtINR(groupRowTotal)}
+                      {groupRowDebitTotal > 0 ? (
+                        <span style={{ fontWeight: 700, color: YELLOW_TEXT }}>
+                          {fmtINR(groupRowDebitTotal)}
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)' }}>-</span>
+                      )}
                     </td>
                   </tr>
                 ),
@@ -559,33 +667,44 @@ export default function TotalDuesSnapshot({ analyses }) {
               }}>
                 Grand Total
               </td>
-              {cards.map(c => (
-                <td key={c} style={{
-                  ...TD,
-                  fontFamily: 'JetBrains Mono, monospace',
-                  fontWeight: 700,
-                  color: cardTotals[c] > 0 ? 'var(--text-primary)' : 'var(--text-muted)',
-                  position: 'sticky',
-                  bottom: 0,
-                  zIndex: 9,
-                  background: '#1e1c15',
-                  borderTop: '2px solid rgba(234,179,8,0.25)',
-                }}>
-                  {fmtINR(cardTotals[c] || 0)}
-                </td>
-              ))}
+              {cards.map(c => {
+                const ct = cardTotals[c];
+                return (
+                  <td key={c} style={{
+                    ...TD,
+                    padding: '8px 14px',
+                    position: 'sticky',
+                    bottom: 0,
+                    zIndex: 9,
+                    background: 'var(--table-grand-bg)',
+                    borderTop: '2px solid rgba(234,179,8,0.25)',
+                  }}>
+                    {ct.debit > 0 ? (
+                      <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {fmtINR(ct.debit)}
+                      </span>
+                    ) : (
+                      <span style={{ color: 'var(--text-muted)' }}>-</span>
+                    )}
+                  </td>
+                );
+              })}
               <td style={{
                 ...TD,
-                fontFamily: 'JetBrains Mono, monospace',
-                fontWeight: 800,
-                color: YELLOW_TEXT,
+                padding: '8px 14px',
                 position: 'sticky',
                 bottom: 0,
                 zIndex: 9,
                 background: 'var(--table-grand-bg)',
                 borderTop: '2px solid var(--table-grand-border)',
               }}>
-                {fmtINR(grandTotal)}
+                {grandTotal.debit > 0 ? (
+                  <span style={{ fontWeight: 800, color: YELLOW_TEXT }}>
+                    {fmtINR(grandTotal.debit)}
+                  </span>
+                ) : (
+                  <span style={{ color: 'var(--text-muted)' }}>-</span>
+                )}
               </td>
             </tr>
           </tbody>

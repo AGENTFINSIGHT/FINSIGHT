@@ -1,21 +1,8 @@
 import { useState, useMemo } from 'react';
-import { FileText, TrendingDown, TrendingUp, Minus, Search, X, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
+import { FileText, Search, X, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
 import TransactionModal from './TransactionModal';
 import { fmtINR, extractCardLabel } from '../utils/dashboardUtils';
 import { supabase } from '../lib/supabase.js';
-
-const CATEGORIES = ['Food', 'Fuel', 'Travel', 'Shopping', 'Bills', 'Entertainment', 'Healthcare', 'Others'];
-
-const CAT_COLORS = {
-  Food: '#f97316',
-  Fuel: '#eab308',
-  Travel: '#06b6d4',
-  Shopping: '#a855f7',
-  Bills: '#ec4899',
-  Entertainment: '#14b8a6',
-  Healthcare: '#22c55e',
-  Others: '#94a3b8',
-};
 
 const TH = {
   padding: '11px 12px',
@@ -38,38 +25,30 @@ const TD = {
 };
 
 function shortName(fileName) {
-  // Strip extension, truncate at 28 chars
   const noExt = (fileName || '').replace(/\.[^.]+$/, '');
   return noExt.length > 30 ? noExt.slice(0, 28) + '…' : noExt;
 }
 
-export default function PdfExpenditureSnapshot({ analyses }) {
+export default function RemainingDuesSnapshot({ analyses }) {
   const [modal, setModal] = useState(null);
-  const [sortField, setSortField] = useState('total_debit'); // 'total_debit' | 'total_credit' | cat name
+  const [sortField, setSortField] = useState('remainingDue'); // 'fileName' | 'totalDebit' | 'totalCredit' | 'remainingDue'
   const [sortDir, setSortDir] = useState(-1); // -1 = desc, 1 = asc
   
-  // Optimization States: Search & Pagination
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCard, setSelectedCard] = useState('all');
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Build per-PDF rows
+  // Process rows
   const rows = useMemo(() => {
     return analyses.map(a => {
       const txns = a.result_json?.transactions || [];
-      const catMap = {};
-      CATEGORIES.forEach(c => { catMap[c] = { total: 0, transactions: [] }; });
-
       let totalDebit = 0;
       let totalCredit = 0;
 
       txns.forEach(t => {
         const amt = Number(t.amount) || 0;
-        const cat = CATEGORIES.includes(t.category) ? t.category : 'Others';
         if (t.type === 'debit') {
-          catMap[cat].total += amt;
-          catMap[cat].transactions.push(t);
           totalDebit += amt;
         } else if (t.type === 'credit') {
           totalCredit += amt;
@@ -83,15 +62,16 @@ export default function PdfExpenditureSnapshot({ analyses }) {
 
       return {
         id: a.id,
-        fileName: a.file_name || 'Unknown File',
+        fileName: a.file_name || 'Unknown Statement',
         cardLabel,
         currency: a.currency || '₹',
-        catMap,
         totalDebit: totalDebitRound,
         totalCredit: totalCreditRound,
         remainingDue,
+        status: remainingDue === 0 ? 'Paid' : 'Unpaid',
         txnCount: txns.length,
         uploadedAt: a.created_at,
+        transactions: txns,
         fileUrl: a.file_url,
       };
     });
@@ -114,50 +94,52 @@ export default function PdfExpenditureSnapshot({ analyses }) {
   const sortedRows = useMemo(() => {
     return [...rows].sort((a, b) => {
       let av, bv;
-      if (sortField === 'total_debit') { av = a.totalDebit; bv = b.totalDebit; }
-      else if (sortField === 'total_credit') { av = a.totalCredit; bv = b.totalCredit; }
-      else if (sortField === 'remaining_due') { av = a.remainingDue; bv = b.remainingDue; }
-      else { av = a.catMap[sortField]?.total || 0; bv = b.catMap[sortField]?.total || 0; }
+      if (sortField === 'fileName') {
+        av = a.fileName.toLowerCase();
+        bv = b.fileName.toLowerCase();
+        return av.localeCompare(bv) * sortDir;
+      }
+      if (sortField === 'totalDebit') { av = a.totalDebit; bv = b.totalDebit; }
+      else if (sortField === 'totalCredit') { av = a.totalCredit; bv = b.totalCredit; }
+      else if (sortField === 'remainingDue') { av = a.remainingDue; bv = b.remainingDue; }
+      else { av = a.uploadedAt; bv = b.uploadedAt; }
       return (av - bv) * sortDir;
     });
   }, [rows, sortField, sortDir]);
 
-  // Filter rows by search query AND card selection
+  // Filter by search query AND card selection
   const filteredRows = useMemo(() => {
     let result = sortedRows;
-
+    
     // Filter by card selection
     if (selectedCard !== 'all') {
       result = result.filter(r => r.cardLabel === selectedCard);
     }
-
+    
     // Filter by search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       result = result.filter(r => r.fileName.toLowerCase().includes(query) || r.cardLabel.toLowerCase().includes(query));
     }
-
+    
     return result;
   }, [sortedRows, searchQuery, selectedCard]);
 
-  // Column totals of the currently filtered subset
+  // Column totals
   const colTotals = useMemo(() => {
-    const totals = { total_debit: 0, total_credit: 0, remaining_due: 0 };
-    CATEGORIES.forEach(c => { totals[c] = 0; });
+    const totals = { totalDebit: 0, totalCredit: 0 };
     filteredRows.forEach(r => {
-      totals.total_debit += r.totalDebit;
-      totals.total_credit += r.totalCredit;
-      CATEGORIES.forEach(c => { totals[c] += r.catMap[c]?.total || 0; });
+      totals.totalDebit += r.totalDebit;
+      totals.totalCredit += r.totalCredit;
     });
-    // Round totals
-    totals.total_debit = Math.round(totals.total_debit * 100) / 100;
-    totals.total_credit = Math.round(totals.total_credit * 100) / 100;
+    totals.totalDebit = Math.round(totals.totalDebit * 100) / 100;
+    totals.totalCredit = Math.round(totals.totalCredit * 100) / 100;
     // Consolidated remaining due is the global difference between total statement dues and payments
-    totals.remaining_due = Math.max(0, Math.round((totals.total_debit - totals.total_credit) * 100) / 100);
+    totals.remainingDue = Math.max(0, Math.round((totals.totalDebit - totals.totalCredit) * 100) / 100);
     return totals;
   }, [filteredRows]);
 
-  // Paginated subset of rows
+  // Paginated rows
   const paginatedRows = useMemo(() => {
     if (pageSize === 'all') return filteredRows;
     const startIndex = (currentPage - 1) * pageSize;
@@ -183,39 +165,25 @@ export default function PdfExpenditureSnapshot({ analyses }) {
     return (
       <div style={{ textAlign: 'center', padding: 60 }}>
         <FileText size={40} color="var(--text-muted)" style={{ marginBottom: 12 }} />
-        <p className="text-muted">No analyses found. Upload a PDF to begin.</p>
+        <p className="text-muted">No statements found. Upload a credit card statement to begin.</p>
       </div>
     );
   }
 
-  const YELLOW_BG = 'var(--table-yellow-bg)';
   const YELLOW_TEXT = 'var(--table-yellow-text)';
-  const RED = 'var(--red)';
-  const EMERALD = 'var(--emerald)';
 
   return (
     <div>
-      {/* Summary strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 12, marginBottom: 24 }}>
+      {/* Summary Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 320px)', gap: 16, marginBottom: 24 }}>
         <div className="stat-card red" style={{ margin: 0 }}>
-          <div className="stat-label">Total Due</div>
-          <div className="stat-value" style={{ fontSize: '1.2rem' }}>₹{fmtINR(colTotals.total_debit)}</div>
-          <div className="stat-sub">{filteredRows.length} PDF{filteredRows.length !== 1 ? 's' : ''} · total debits</div>
-        </div>
-        <div className="stat-card purple" style={{ margin: 0 }}>
-          <div className="stat-label">Top Category</div>
-          <div className="stat-value" style={{ fontSize: '1rem' }}>
-            {(() => {
-              const top = CATEGORIES.reduce((best, c) =>
-                (colTotals[c] || 0) > (colTotals[best] || 0) ? c : best, CATEGORIES[0]);
-              return colTotals[top] > 0 ? top : 'None';
-            })()}
-          </div>
-          <div className="stat-sub">Highest spend category</div>
+          <div className="stat-label">Total Statement Dues</div>
+          <div className="stat-value" style={{ fontSize: '1.3rem' }}>₹{fmtINR(colTotals.totalDebit)}</div>
+          <div className="stat-sub">{filteredRows.length} Statement{filteredRows.length !== 1 ? 's' : ''}</div>
         </div>
       </div>
 
-      {/* Optimization Control Bar (Search & Page Size) */}
+      {/* Search & Filtration Control Bar */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -224,9 +192,9 @@ export default function PdfExpenditureSnapshot({ analyses }) {
         marginBottom: 16,
         flexWrap: 'wrap'
       }}>
-        {/* Search Bar & Card Filter */}
+        {/* Search & Filtration Selector Wrapper */}
         <div style={{ display: 'flex', gap: 12, flex: 1, minWidth: '240px', flexWrap: 'wrap', alignItems: 'center' }}>
-          {/* Search Bar */}
+          {/* Search */}
           <div style={{ position: 'relative', flex: 1, minWidth: '200px', maxWidth: '380px' }}>
             <input
               type="text"
@@ -311,7 +279,7 @@ export default function PdfExpenditureSnapshot({ analyses }) {
           </div>
         </div>
 
-        {/* Page Size Selection */}
+        {/* Page Size */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
             Showing {filteredRows.length} of {rows.length} statements
@@ -340,18 +308,13 @@ export default function PdfExpenditureSnapshot({ analyses }) {
               <option value={5}>5</option>
               <option value={10}>10</option>
               <option value={20}>20</option>
-              <option value={50}>50</option>
               <option value="all">All</option>
             </select>
           </div>
         </div>
       </div>
 
-      <p style={{ marginBottom: 12, fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-        Click any amount to view transaction details · Click column headers to sort
-      </p>
-
-      {/* Main table with Scroll & Sticky layout */}
+      {/* Main Table */}
       <div style={{ 
         maxHeight: '440px', 
         overflowY: 'auto', 
@@ -361,14 +324,13 @@ export default function PdfExpenditureSnapshot({ analyses }) {
         position: 'relative',
         background: 'var(--bg-card)'
       }}>
-        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, minWidth: 900 }}>
+        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, minWidth: 800 }}>
           <thead>
             <tr style={{ background: 'var(--bg-secondary)' }}>
-              {/* PDF name col (Sticky to both top and left) */}
               <th style={{ 
                 ...TH, 
                 textAlign: 'left', 
-                minWidth: 180, 
+                minWidth: 200, 
                 position: 'sticky', 
                 left: 0, 
                 top: 0, 
@@ -376,51 +338,27 @@ export default function PdfExpenditureSnapshot({ analyses }) {
                 zIndex: 12,
                 borderBottom: '1px solid var(--border-subtle)',
               }}>
-                PDF File
+                Statement File
               </th>
-              {/* Category cols (Sticky to top) */}
-              {CATEGORIES.map(c => (
-                <th
-                  key={c}
-                  style={{ 
-                    ...TH, 
-                    cursor: 'pointer', 
-                    minWidth: 100,
-                    position: 'sticky',
-                    top: 0,
-                    background: 'var(--bg-secondary)',
-                    zIndex: 10,
-                    borderBottom: '1px solid var(--border-subtle)',
-                  }}
-                  onClick={() => toggleSort(c)}
-                >
-                  <span style={{ borderBottom: `2px solid ${CAT_COLORS[c]}`, paddingBottom: 1 }}>{c}</span>
-                  {' '}{sortArrow(c)}
-                </th>
-              ))}
+              <th style={{ ...TH, textAlign: 'center', minWidth: 120, position: 'sticky', top: 0, background: 'var(--bg-secondary)', zIndex: 10, borderBottom: '1px solid var(--border-subtle)' }}>
+                Card Number
+              </th>
+              <th style={{ ...TH, minWidth: 100, position: 'sticky', top: 0, background: 'var(--bg-secondary)', zIndex: 10, borderBottom: '1px solid var(--border-subtle)' }}>
+                Upload Date
+              </th>
               <th
-                style={{ 
-                  ...TH, 
-                  cursor: 'pointer', 
-                  minWidth: 110,
-                  position: 'sticky',
-                  top: 0,
-                  background: 'var(--bg-secondary)',
-                  color: YELLOW_TEXT,
-                  zIndex: 10,
-                  borderBottom: '1px solid var(--border-subtle)',
-                }}
-                onClick={() => toggleSort('total_debit')}
+                style={{ ...TH, cursor: 'pointer', minWidth: 110, position: 'sticky', top: 0, background: 'var(--bg-secondary)', zIndex: 10, borderBottom: '1px solid var(--border-subtle)' }}
+                onClick={() => toggleSort('totalDebit')}
               >
-                Total Due {sortArrow('total_debit')}
+                Total Due {sortArrow('totalDebit')}
               </th>
             </tr>
           </thead>
           <tbody>
             {paginatedRows.length === 0 ? (
               <tr>
-                <td colSpan={CATEGORIES.length + 3} style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                  No matching bank statements found.
+                <td colSpan={4} style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                  No matching statements found.
                 </td>
               </tr>
             ) : paginatedRows.map((row, ri) => {
@@ -439,7 +377,7 @@ export default function PdfExpenditureSnapshot({ analyses }) {
                     left: 0,
                     background: ri % 2 === 0 ? 'var(--bg-card)' : 'var(--table-stripe-alt)',
                     zIndex: 8,
-                    maxWidth: 200,
+                    maxWidth: 220,
                     borderBottom: '1px solid rgba(255,255,255,0.04)',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -452,7 +390,7 @@ export default function PdfExpenditureSnapshot({ analyses }) {
                       </div>
                       <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ margin: 0, fontWeight: 600, fontSize: '0.82rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 140 }}
+                          <span style={{ margin: 0, fontWeight: 600, fontSize: '0.82rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 160 }}
                              title={row.fileName}>
                             {shortName(row.fileName)}
                           </span>
@@ -487,60 +425,37 @@ export default function PdfExpenditureSnapshot({ analyses }) {
                         </div>
                         <span style={{ margin: 0, fontSize: '0.68rem', color: 'var(--text-muted)' }}>
                           {row.txnCount} txn{row.txnCount !== 1 ? 's' : ''}
-                          {row.cardLabel ? ` · ${row.cardLabel}` : ''}
-                          {row.uploadedAt ? ` · ${new Date(row.uploadedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : ''}
                         </span>
                       </div>
                     </div>
                   </td>
 
-                  {/* Per-category cells */}
-                  {CATEGORIES.map(c => {
-                    const val = row.catMap[c]?.total || 0;
-                    const txns = row.catMap[c]?.transactions || [];
-                    return (
-                      <td
-                        key={c}
-                        style={{ 
-                          ...TD, 
-                          cursor: val > 0 ? 'pointer' : 'default',
-                          borderBottom: '1px solid rgba(255,255,255,0.04)',
-                        }}
-                        onClick={() => val > 0 && setModal({
-                          title: `${shortName(row.fileName)} · ${c}`,
-                          transactions: txns,
-                        })}
-                      >
-                        {val > 0 ? (
-                          <span style={{
-                            color: CAT_COLORS[c],
-                            fontWeight: 600,
-                            textDecoration: 'underline dotted',
-                          }}>
-                            ₹{fmtINR(val)}
-                          </span>
-                        ) : (
-                          <span style={{ color: 'var(--text-muted)', opacity: 0.4 }}>—</span>
-                        )}
-                      </td>
-                    );
-                  })}
+                  {/* Card number */}
+                  <td style={{ ...TD, textAlign: 'center', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <span className="badge" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: '0.74rem', fontWeight: 600, border: '1px solid var(--border-subtle)' }}>
+                      {row.cardLabel}
+                    </span>
+                  </td>
+
+                  {/* Upload Date */}
+                  <td style={{ ...TD, borderBottom: '1px solid rgba(255,255,255,0.04)', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                    {row.uploadedAt ? new Date(row.uploadedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                  </td>
 
                   {/* Total Due */}
                   <td style={{ 
                     ...TD, 
-                    background: ri % 2 === 0 ? 'rgba(234,179,8,0.03)' : 'rgba(234,179,8,0.05)', 
-                    fontWeight: 700, 
-                    color: row.totalDebit > 0 ? YELLOW_TEXT : 'var(--text-muted)',
                     borderBottom: '1px solid rgba(255,255,255,0.04)',
+                    color: 'var(--text-primary)',
+                    fontWeight: 600
                   }}>
-                    {row.totalDebit > 0 ? `₹${fmtINR(row.totalDebit)}` : '—'}
+                    ₹{fmtINR(row.totalDebit)}
                   </td>
                 </tr>
               );
             })}
 
-            {/* Grand totals row (Sticky to bottom) */}
+            {/* Grand Totals */}
             <tr style={{ 
               position: 'sticky', 
               bottom: 0, 
@@ -548,7 +463,7 @@ export default function PdfExpenditureSnapshot({ analyses }) {
               zIndex: 11,
               boxShadow: '0 -4px 12px rgba(0,0,0,0.3)'
             }}>
-              <td style={{ 
+              <td colSpan={3} style={{ 
                 ...TD, 
                 textAlign: 'left', 
                 position: 'sticky', 
@@ -562,18 +477,6 @@ export default function PdfExpenditureSnapshot({ analyses }) {
               }}>
                 Grand Total
               </td>
-              {CATEGORIES.map(c => (
-                <td key={c} style={{ 
-                  ...TD, 
-                  fontWeight: 700, 
-                  color: colTotals[c] > 0 ? 'var(--text-primary)' : 'var(--text-muted)',
-                  borderTop: '2px solid rgba(234,179,8,0.25)',
-                  background: 'var(--table-footer-bg)'
-                }}>
-                  {colTotals[c] > 0 ? `₹${fmtINR(colTotals[c])}` : '—'}
-                </td>
-              ))}
-              {/* Grand Total Due */}
               <td style={{ 
                 ...TD, 
                 fontWeight: 800, 
@@ -581,7 +484,7 @@ export default function PdfExpenditureSnapshot({ analyses }) {
                 borderTop: '2px solid rgba(234,179,8,0.25)',
                 background: 'rgba(234,179,8,0.15)'
               }}>
-                ₹{fmtINR(colTotals.total_debit)}
+                ₹{fmtINR(colTotals.totalDebit)}
               </td>
             </tr>
           </tbody>
@@ -630,19 +533,6 @@ export default function PdfExpenditureSnapshot({ analyses }) {
         </div>
       )}
 
-      {/* Category legend */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 16 }}>
-        {CATEGORIES.map(c => (
-          <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            <div style={{ width: 8, height: 8, borderRadius: 2, background: CAT_COLORS[c] }} />
-            {c}
-            {colTotals[c] > 0 && (
-              <span style={{ color: CAT_COLORS[c], fontWeight: 600 }}>₹{fmtINR(colTotals[c])}</span>
-            )}
-          </div>
-        ))}
-      </div>
-
       {modal && (
         <TransactionModal
           title={modal.title}
@@ -653,4 +543,3 @@ export default function PdfExpenditureSnapshot({ analyses }) {
     </div>
   );
 }
-
