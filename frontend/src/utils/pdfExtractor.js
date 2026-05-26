@@ -1,10 +1,7 @@
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Use the bundled worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url
-).toString();
+// Use a stable public CDN for the worker to avoid MIME type errors in static hosting environments like Render
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
 
 // Approx character count that's safe to send in one AI call (~50K chars ≈ ~12K tokens)
 const CHUNK_CHAR_LIMIT = 48_000;
