@@ -180,6 +180,86 @@ function parseJSON(raw) {
   }
 }
 
+/**
+ * Detects and removes duplicated transactions that are AI model hallucinations.
+ * If the exact same transaction is extracted multiple times, it verifies the number of
+ * occurrences of the transaction amount or merchant in the raw statement text.
+ */
+function deduplicateHallucinations(result, rawText) {
+  if (!result || !Array.isArray(result.transactions)) return result;
+  if (!rawText || typeof rawText !== 'string') return result;
+
+  const txns = result.transactions;
+  const uniqueTxns = [];
+  const txnCounts = new Map();
+
+  // Group transactions by identity to detect duplicates
+  txns.forEach(t => {
+    const key = `${t.date}|${String(t.description || '').trim().toLowerCase()}|${t.amount}|${t.type}`;
+    if (!txnCounts.has(key)) {
+      txnCounts.set(key, { txn: t, count: 0 });
+    }
+    txnCounts.get(key).count += 1;
+  });
+
+  for (const [key, item] of txnCounts.entries()) {
+    const { txn, count } = item;
+    if (count <= 1) {
+      uniqueTxns.push(txn);
+      continue;
+    }
+
+    const desc = txn.description || '';
+    const amt = txn.amount;
+
+    // Build a safe search pattern for the amount or merchant in the raw text
+    const cleanDesc = desc.replace(/[^a-zA-Z0-9\s]/g, ' ').trim();
+    const words = cleanDesc.split(/\s+/).filter(w => w.length > 2);
+    const searchWord = words[0] || desc;
+
+    const escapedWord = searchWord.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const escapedAmt = String(amt).replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+
+    // Count occurrence matches of the amount in the raw text
+    const amtRegex = new RegExp(`\\b${escapedAmt}\\b|\\b${Math.floor(amt)}\\b`, 'gi');
+    const matches = rawText.match(amtRegex) || [];
+    const textOccurrences = matches.length;
+
+    if (textOccurrences < count) {
+      // Duplication identified as hallucination! Keep only the actual occurrences (min 1)
+      const keepCount = Math.max(1, textOccurrences);
+      console.log(`🛡️ Deduplicating hallucinated transaction: "${desc}" from ${count} down to ${keepCount}`);
+      for (let i = 0; i < keepCount; i++) {
+        uniqueTxns.push(txn);
+      }
+
+      // Adjust the category summary for the extra removed items to match
+      const cat = txn.category || 'Others';
+      const difference = amt * (count - keepCount);
+      if (result.category_summary && cat in result.category_summary) {
+        result.category_summary[cat] = Math.max(0, Math.round((result.category_summary[cat] - difference) * 100) / 100);
+      }
+      
+      // Adjust unnecessary spending list if present
+      if (Array.isArray(result.unnecessary_spending)) {
+        result.unnecessary_spending.forEach(u => {
+          if (u.description === desc || u.description === searchWord) {
+            u.amount = Math.max(0, Math.round((u.amount - difference) * 100) / 100);
+          }
+        });
+      }
+    } else {
+      // Legit distinct identical transactions (e.g. multiple distinct ticket purchases)
+      for (let i = 0; i < count; i++) {
+        uniqueTxns.push(txn);
+      }
+    }
+  }
+
+  result.transactions = uniqueTxns;
+  return result;
+}
+
 /** Recalculate total_debit and total_credit by summing the extracted transactions.
  *  This prevents AI hallucinations where it reads "Previous Statement Dues" or
  *  other balance summary fields as transaction amounts, inflating the totals. */
@@ -399,7 +479,7 @@ router.post('/text', authMiddleware, (req, res, next) => {
       { role: 'user', content: `Analyze this bank statement and return the JSON:\n\n${text}` },
     ], TEXT_MODELS, parseJSON);
 
-    const data = recalcTotals(parseJSON(raw));
+    const data = recalcTotals(deduplicateHallucinations(parseJSON(raw), text));
     cacheSet(ck, data);  // store for next retry
     await saveAnalysis(req.user.id, fileName, fileType, fileUrl, data);
     res.json(data);
