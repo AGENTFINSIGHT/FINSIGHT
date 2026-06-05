@@ -8,6 +8,7 @@ import SpendCategorySnapshot from '../components/SpendCategorySnapshot';
 import HistorySnapshot from '../components/HistorySnapshot';
 import PdfExpenditureSnapshot from '../components/PdfExpenditureSnapshot';
 import RemainingDuesSnapshot from '../components/RemainingDuesSnapshot';
+import { sanitizeAnalyses } from '../utils/dashboardUtils';
 
 const TABS = [
   { key: 'snapshot',      label: 'Total Dues Snapshot',    icon: BarChart2   },
@@ -31,7 +32,7 @@ export default function DashboardPage() {
       // fetchHistory returns summary rows; we need full result_json for each
       const summaries = await fetchHistory();
       const full = await Promise.all(summaries.map(s => fetchAnalysisById(s.id)));
-      setAnalyses(full.filter(Boolean));
+      setAnalyses(sanitizeAnalyses(full.filter(Boolean)));
     } catch (e) {
       setError('Failed to load analyses. ' + (e.message || ''));
     } finally {

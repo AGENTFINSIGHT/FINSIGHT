@@ -134,13 +134,15 @@ export default function RemainingDuesSnapshot({ analyses }) {
 
   // Column totals
   const colTotals = useMemo(() => {
-    const totals = { displayDue: 0, totalCredit: 0 };
+    const totals = { displayDue: 0, totalCredit: 0, remainingDue: 0 };
     filteredRows.forEach(r => {
       totals.displayDue += r.displayDue;
       totals.totalCredit += r.totalCredit;
+      totals.remainingDue += r.remainingDue;
     });
     totals.displayDue = Math.round(totals.displayDue * 100) / 100;
     totals.totalCredit = Math.round(totals.totalCredit * 100) / 100;
+    totals.remainingDue = Math.round(totals.remainingDue * 100) / 100;
     return totals;
   }, [filteredRows]);
 

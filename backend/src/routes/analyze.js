@@ -82,8 +82,8 @@ Return EXACTLY this JSON schema:
 
 Rules:
 - card_number: Extract the credit/debit card number shown in the statement header or transaction rows (e.g. "6528XXXXXXXX5003"). If not found, use "Unknown Card".
-- total_amount_due: Extract the "Total Amount Due" / "New Balance" / "Total Due" / "Statement Balance" shown in the statement summary/header. This is the final outstanding amount the bank asks the customer to pay. It is NOT the sum of debits — it includes previous balance, fees, interest minus payments/credits. If not found, set to 0.
-- minimum_amount_due: Extract the "Minimum Amount Due" / "Minimum Due" shown in the statement summary. If not found, set to 0.
+- total_amount_due: Extract the "Total Amount Due" / "New Balance" / "Total Due" / "Statement Balance" shown in the statement summary/header. This is the final outstanding amount the bank asks the customer to pay. It is NOT the sum of debits — it includes previous balance, fees, interest minus payments/credits. Note that in some statements (like ICICI Bank), the values for Total Amount Due and Minimum Amount Due might appear in a list or be text-extracted in a different order. Total Amount Due is always the larger number (e.g., ₹1,16,140.74), and Minimum Amount Due is always the smaller number (e.g., ₹5,810.00, typically around 5% of the total). Do not swap them! If not found, set to 0.
+- minimum_amount_due: Extract the "Minimum Amount Due" / "Minimum Due" shown in the statement summary. It is always the smaller number. If not found, set to 0.
 - Normalize merchant names, remove duplicates, infer categories semantically.
 - Return raw JSON only — start with { and end with }.
 
@@ -264,10 +264,68 @@ function deduplicateHallucinations(result, rawText) {
   return result;
 }
 
+/** Sanitize credit/debit transaction types to correct AI errors programmatically */
+function sanitizeTransactionTypes(result) {
+  if (!result || !Array.isArray(result.transactions)) return result;
+
+  const creditKeywords = [
+    'payment received', 
+    'thank you', 
+    'payment thank you', 
+    'cc payment received',
+    'cc payment thank you',
+    'autopay payment',
+    'clearance', 
+    'refund', 
+    'cashback', 
+    'reversal', 
+    'waiver', 
+    'credit received', 
+    'cr received', 
+    'pymt received', 
+    'payment rec'
+  ];
+
+  result.transactions.forEach(t => {
+    const desc = String(t.description || '').toLowerCase();
+    
+    // Check if description has credit keywords
+    let isCredit = creditKeywords.some(keyword => desc.includes(keyword));
+    
+    // Also check if the description ends with "cr" or contains " cr" (indicates credit)
+    if (!isCredit) {
+      if (desc.endsWith(' cr') || desc.includes(' cr ') || desc.includes('(cr)')) {
+        isCredit = true;
+      }
+    }
+    
+    // Explicitly exclude certain keywords that might contain credit keywords but are debits
+    if (isCredit) {
+      const debitExclusions = ['gst payment', 'tax payment', 'interest payment', 'convenience fee on payment'];
+      const hasExclusion = debitExclusions.some(ex => desc.includes(ex));
+      if (hasExclusion) {
+        isCredit = false;
+      }
+    }
+
+    if (isCredit) {
+      console.log(`🔧 Correcting transaction type to "credit": "${t.description}"`);
+      t.type = 'credit';
+    } else {
+      t.type = 'debit';
+    }
+  });
+
+  return result;
+}
+
 /** Recalculate total_debit and total_credit by summing the extracted transactions.
  *  This prevents AI hallucinations where it reads "Previous Statement Dues" or
  *  other balance summary fields as transaction amounts, inflating the totals. */
 function recalcTotals(result) {
+  // Programmatically sanitize transaction types first to ensure correct totals
+  result = sanitizeTransactionTypes(result);
+
   const txns = result.transactions || [];
   let debit = 0, credit = 0;
   txns.forEach(t => {
@@ -277,6 +335,14 @@ function recalcTotals(result) {
   });
   result.total_debit  = Math.round(debit  * 100) / 100;
   result.total_credit = Math.round(credit * 100) / 100;
+
+  // Always correct total_amount_due if it was hallucinated as the sum of all transactions (debit + credit)
+  const sumAll = Math.round((debit + credit) * 100) / 100;
+  if (result.total_amount_due && Math.abs(result.total_amount_due - sumAll) < 1) {
+    result.total_amount_due = Math.round(debit * 100) / 100;
+    console.log(`🔧 [Backend] Corrected total_amount_due from ${sumAll} to ${debit}`);
+  }
+
   return result;
 }
 

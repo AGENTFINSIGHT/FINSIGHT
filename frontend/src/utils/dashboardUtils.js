@@ -122,3 +122,89 @@ export function getUniqueCards(analyses) {
   });
   return result;
 }
+
+/** Sanitize and correct credit/debit transaction types in-memory to fix legacy/AI parsing errors. */
+export function sanitizeAnalyses(analyses) {
+  if (!Array.isArray(analyses)) return [];
+
+  const creditKeywords = [
+    'payment received', 
+    'thank you', 
+    'payment thank you', 
+    'cc payment received',
+    'cc payment thank you',
+    'autopay payment',
+    'clearance', 
+    'refund', 
+    'cashback', 
+    'reversal', 
+    'waiver', 
+    'credit received', 
+    'cr received', 
+    'pymt received', 
+    'payment rec'
+  ];
+
+  return analyses.map(analysis => {
+    if (!analysis?.result_json) return analysis;
+    
+    // Deep clone the result_json to avoid side-effects
+    const resultJson = JSON.parse(JSON.stringify(analysis.result_json));
+    const txns = resultJson.transactions || [];
+    
+    let hasChanges = false;
+    let debit = 0;
+    let credit = 0;
+
+    txns.forEach(t => {
+      const desc = String(t.description || '').toLowerCase();
+      let isCredit = creditKeywords.some(keyword => desc.includes(keyword));
+      
+      if (!isCredit) {
+        if (desc.endsWith(' cr') || desc.includes(' cr ') || desc.includes('(cr)')) {
+          isCredit = true;
+        }
+      }
+
+      if (isCredit) {
+        const debitExclusions = ['gst payment', 'tax payment', 'interest payment', 'convenience fee on payment'];
+        const hasExclusion = debitExclusions.some(ex => desc.includes(ex));
+        if (hasExclusion) {
+          isCredit = false;
+        }
+      }
+
+      const originalType = t.type;
+      const targetType = isCredit ? 'credit' : 'debit';
+      if (originalType !== targetType) {
+        t.type = targetType;
+        hasChanges = true;
+      }
+
+      const amt = Number(t.amount) || 0;
+      if (t.type === 'debit') {
+        debit += amt;
+      } else if (t.type === 'credit') {
+        credit += amt;
+      }
+    });
+
+    if (hasChanges) {
+      resultJson.total_debit = Math.round(debit * 100) / 100;
+      resultJson.total_credit = Math.round(credit * 100) / 100;
+      console.log(`🔧 [Frontend] In-memory corrected transaction types for: "${analysis.file_name}"`);
+    }
+
+    // Always correct total_amount_due if it was hallucinated as the sum of all transactions (debit + credit)
+    const sumAll = Math.round((debit + credit) * 100) / 100;
+    if (resultJson.total_amount_due && Math.abs(resultJson.total_amount_due - sumAll) < 1) {
+      resultJson.total_amount_due = Math.round(debit * 100) / 100;
+      console.log(`🔧 [Frontend] Corrected total_amount_due from ${sumAll} to ${debit} for "${analysis.file_name}"`);
+    }
+
+    return {
+      ...analysis,
+      result_json: resultJson
+    };
+  });
+}
