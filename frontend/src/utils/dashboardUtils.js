@@ -208,3 +208,52 @@ export function sanitizeAnalyses(analyses) {
     };
   });
 }
+
+/** Deduplicate analyses so that the same statement (same card + same billing month)
+ *  uploaded multiple times only appears once — keeping the most recent upload.
+ *
+ *  Dedup key: normalizedCardLabel + dominant transaction month (YYYY-MM).
+ *  "Dominant month" = the month that has the most transactions in the statement,
+ *  which reliably identifies the billing cycle even across different filenames. */
+export function deduplicateAnalyses(analyses) {
+  if (!Array.isArray(analyses) || analyses.length <= 1) return analyses;
+
+  /** Find the month that contains the most transactions in a statement. */
+  function getDominantMonth(analysis) {
+    const txns = analysis?.result_json?.transactions || [];
+    const counts = {};
+    txns.forEach(t => {
+      const mk = getMonthKey(t.date);
+      if (mk) counts[mk] = (counts[mk] || 0) + 1;
+    });
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    return sorted[0]?.[0] || 'unknown';
+  }
+
+  // Group by card label + dominant month
+  const groups = new Map();
+  analyses.forEach(a => {
+    const card = extractCardLabel(a);
+    const month = getDominantMonth(a);
+    const key = `${card}__${month}`;
+
+    if (!groups.has(key)) {
+      groups.set(key, a);
+    } else {
+      // Keep the more recent upload (by created_at), or the one with more transactions
+      const existing = groups.get(key);
+      const existingDate = new Date(existing.created_at || 0).getTime();
+      const currentDate = new Date(a.created_at || 0).getTime();
+
+      if (currentDate > existingDate) {
+        groups.set(key, a);
+      }
+    }
+  });
+
+  const deduplicated = Array.from(groups.values());
+  if (deduplicated.length < analyses.length) {
+    console.log(`🧹 [Frontend] Deduplicated: ${analyses.length} → ${deduplicated.length} analyses (removed ${analyses.length - deduplicated.length} duplicate statement(s))`);
+  }
+  return deduplicated;
+}
