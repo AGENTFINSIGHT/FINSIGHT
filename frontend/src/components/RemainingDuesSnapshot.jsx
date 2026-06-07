@@ -59,9 +59,13 @@ export default function RemainingDuesSnapshot({ analyses }) {
       const totalCreditRound = Math.round(totalCredit * 100) / 100;
 
       // Use total_amount_due from statement header if the AI extracted it,
-      // otherwise fall back to the sum of debit transactions
-      const statementDue = Number(a.result_json?.total_amount_due) || 0;
-      const displayDue = statementDue > 0 ? statementDue : totalDebitRound;
+      // otherwise fall back to the sum of debit transactions.
+      // Note: 0 is a valid amount due, so we only fall back if total_amount_due is undefined/null.
+      const rawDue = a.result_json?.total_amount_due;
+      const statementDue = (rawDue !== undefined && rawDue !== null && !isNaN(Number(rawDue)))
+        ? Number(rawDue)
+        : null;
+      const displayDue = statementDue !== null ? statementDue : totalDebitRound;
 
       const remainingDue = Math.max(0, Math.round((totalDebitRound - totalCreditRound) * 100) / 100);
       const cardLabel = extractCardLabel(a);
@@ -185,7 +189,7 @@ export default function RemainingDuesSnapshot({ analyses }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 320px)', gap: 16, marginBottom: 24 }}>
         <div className="stat-card red" style={{ margin: 0 }}>
           <div className="stat-label">Total Statement Dues</div>
-          <div className="stat-value" style={{ fontSize: '1.3rem' }}>₹{fmtINR(colTotals.displayDue)}</div>
+          <div className="stat-value" style={{ fontSize: '1.3rem' }}>₹{colTotals.displayDue === 0 ? '0.00' : fmtINR(colTotals.displayDue)}</div>
           <div className="stat-sub">{filteredRows.length} Statement{filteredRows.length !== 1 ? 's' : ''}</div>
         </div>
       </div>
@@ -456,7 +460,7 @@ export default function RemainingDuesSnapshot({ analyses }) {
                     color: 'var(--text-primary)',
                     fontWeight: 600
                   }}>
-                    ₹{fmtINR(row.displayDue)}
+                    ₹{row.displayDue === 0 ? '0.00' : fmtINR(row.displayDue)}
                   </td>
                 </tr>
               );
@@ -491,7 +495,7 @@ export default function RemainingDuesSnapshot({ analyses }) {
                 borderTop: '2px solid rgba(234,179,8,0.25)',
                 background: 'rgba(234,179,8,0.15)'
               }}>
-                ₹{fmtINR(colTotals.displayDue)}
+                ₹{colTotals.displayDue === 0 ? '0.00' : fmtINR(colTotals.displayDue)}
               </td>
             </tr>
           </tbody>
